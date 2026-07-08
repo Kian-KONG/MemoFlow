@@ -1,0 +1,65 @@
+[project]
+name = "memoflow"
+version = "0.1.0"
+description = "本地部署的 AI 会议助手 —— 转写 / 说话人识别 / 摘要 / 决策与行动项提取 / 知识库检索"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+
+dependencies = [
+    # --- Web / UI ---
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "nicegui>=1.4.0",
+    "python-multipart>=0.0.9",
+    "pydantic>=2.7.0",
+    "pydantic-settings>=2.3.0",
+
+    # --- Persistence ---
+    "sqlalchemy[asyncio]>=2.0.30",
+    "aiosqlite>=0.20.0",
+    "alembic>=1.13.0",
+    "lancedb>=0.9.0",
+    "pyarrow>=16.0.0",
+
+    # --- AI / ML (adapters lazily import these, see infrastructure/ai) ---
+    "funasr>=1.1.0",          # SenseVoice runtime
+    "pyannote.audio>=3.3.0",  # speaker diarization
+    "mlx-lm>=0.14.0",         # Qwen3-14B on Apple Silicon (MLX)
+    "sentence-transformers>=3.0.0",  # embeddings for knowledge base
+    "soundfile>=0.12.1",
+    "librosa>=0.10.2",
+
+    # --- Misc ---
+    "loguru>=0.7.2",
+    "python-dotenv>=1.0.1",
+    "aiofiles>=23.2.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.2.0",
+    "pytest-asyncio>=0.23.7",
+    "httpx>=0.27.0",
+    "ruff>=0.5.0",
+    "mypy>=1.10.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/memoflow"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true

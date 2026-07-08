@@ -1,0 +1,21 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.env
+.DS_Store
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
+# runtime data
+data/
+!data/.gitkeep
+*.db
+*.sqlite3
+lancedb/
+
+# models cache
+models/
+*.gguf
