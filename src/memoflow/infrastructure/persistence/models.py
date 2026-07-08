@@ -32,6 +32,8 @@ class MeetingModel(Base):
     transcript_id: Mapped[str | None] = mapped_column(nullable=True)
     summary_id: Mapped[str | None] = mapped_column(nullable=True)
     error_message: Mapped[str | None] = mapped_column(nullable=True)
+    failed_stage: Mapped[str | None] = mapped_column(nullable=True)
+    resume_status: Mapped[str | None] = mapped_column(nullable=True)
 
 
 class TranscriptModel(Base):

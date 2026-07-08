@@ -19,3 +19,6 @@ class SummaryRepository(ABC):
 
     @abstractmethod
     async def save(self, summary: Summary) -> None: ...
+
+    @abstractmethod
+    async def delete_by_meeting_id(self, meeting_id: str) -> None: ...

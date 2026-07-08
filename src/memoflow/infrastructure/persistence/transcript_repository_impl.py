@@ -37,3 +37,9 @@ class SqlAlchemyTranscriptRepository(TranscriptRepository):
         await self._session.delete(model)
         await self._session.flush()
         self._session.add(transcript_to_model(transcript))
+
+    async def delete_by_meeting_id(self, meeting_id: str) -> None:
+        stmt = select(TranscriptModel).where(TranscriptModel.meeting_id == meeting_id)
+        result = await self._session.execute(stmt)
+        for model in result.scalars().all():
+            await self._session.delete(model)

@@ -22,7 +22,7 @@ from memoflow.application.ports.llm_port import LLMPort
 from memoflow.application.ports.pipeline_runner import PipelineRunner
 from memoflow.application.ports.unit_of_work import UnitOfWorkFactory
 from memoflow.application.summary_service import SummaryApplicationService
-from memoflow.application.system_service import SystemStatusService
+from memoflow.application.system_service import ModelService
 from memoflow.application.transcription_service import TranscriptionApplicationService
 from memoflow.config import Settings
 from memoflow.domain.knowledge.repository import VectorRepository
@@ -55,7 +55,7 @@ class AppContainer:
     transcription_service: TranscriptionApplicationService
     summary_service: SummaryApplicationService
     knowledge_service: KnowledgeApplicationService
-    system_service: SystemStatusService
+    system_service: ModelService
 
     pipeline: MeetingProcessingPipeline
     pipeline_runner: PipelineRunner
@@ -92,14 +92,14 @@ def build_container(settings: Settings) -> AppContainer:
     transcription_service = TranscriptionApplicationService(uow_factory, file_storage, asr, diarization)
     summary_service = SummaryApplicationService(uow_factory, llm, llm_model_name=settings.llm_model_path)
     knowledge_service = KnowledgeApplicationService(uow_factory, embedding, vector_repository)
+    system_service = ModelService(settings, asr, diarization, llm, embedding)
 
     pipeline = MeetingProcessingPipeline(
-        uow_factory, transcription_service, summary_service, knowledge_service
+        uow_factory, transcription_service, summary_service, knowledge_service, system_service
     )
     pipeline_runner: PipelineRunner = AsyncioPipelineRunner(pipeline)
 
     meeting_service = MeetingApplicationService(uow_factory, file_storage, event_dispatcher, pipeline_runner)
-    system_service = SystemStatusService(settings, asr, diarization, llm, embedding)
 
     return AppContainer(
         settings=settings,

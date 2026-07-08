@@ -71,7 +71,10 @@ def _register_ui_once() -> None:
 
     class _LazyContainer:
         def __getattr__(self, name: str):  # noqa: ANN001, ANN204
-            return getattr(app.state.container, name)
+            container = getattr(app.state, "container", None)
+            if container is None:
+                raise RuntimeError("应用正在启动，请稍后刷新页面")
+            return getattr(container, name)
 
     register_ui(_LazyContainer())  # type: ignore[arg-type]
 

@@ -43,6 +43,13 @@ class QwenMLXLLM(LLMPort):
     def is_loaded(self) -> bool:
         return self._model is not None
 
+    async def preload(self) -> None:
+        await asyncio.to_thread(self._ensure_model_loaded)
+
+    def _require_loaded(self) -> None:
+        if self._model is None:
+            raise RuntimeError("Qwen3 模型尚未下载，请前往设置页下载后再处理会议。")
+
     async def generate(
         self,
         prompt: str,
@@ -59,7 +66,7 @@ class QwenMLXLLM(LLMPort):
         max_tokens: int | None,
         temperature: float | None,
     ) -> str:
-        self._ensure_model_loaded()
+        self._require_loaded()
         assert self._model is not None and self._tokenizer is not None
         from mlx_lm import generate
         from mlx_lm.sample_utils import make_sampler

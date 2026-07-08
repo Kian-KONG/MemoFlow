@@ -93,12 +93,19 @@ class DependencyStatusResponse(BaseModel):
 
 
 class ModelStatusResponse(BaseModel):
+    key: str
     role: str
     model_id: str
     loaded: bool
     ready: bool
+    downloading: bool
     status: str
     hint: str
+
+
+class ModelDownloadResponse(BaseModel):
+    key: str
+    message: str
 
 
 class SystemStatusResponse(BaseModel):

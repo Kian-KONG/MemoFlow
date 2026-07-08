@@ -34,6 +34,8 @@ class Meeting(AggregateRoot[MeetingId]):
         transcript_id: str | None = None,
         summary_id: str | None = None,
         error_message: str | None = None,
+        failed_stage: str | None = None,
+        resume_status: str | None = None,
     ) -> None:
         super().__init__(meeting_id)
         if not title.strip():
@@ -46,6 +48,8 @@ class Meeting(AggregateRoot[MeetingId]):
         self.transcript_id = transcript_id
         self.summary_id = summary_id
         self.error_message = error_message
+        self.failed_stage = failed_stage
+        self.resume_status = resume_status
 
     # ---- 工厂方法 ----
     @classmethod
@@ -73,23 +77,37 @@ class Meeting(AggregateRoot[MeetingId]):
     def start_transcribing(self) -> None:
         self._transition(MeetingStatus.TRANSCRIBING)
 
+    def ensure_transcribing(self) -> None:
+        """进入转写阶段；若已在 transcribing（如重试后）则幂等跳过。"""
+        if self.status == MeetingStatus.TRANSCRIBING:
+            return
+        self.start_transcribing()
+
     def complete_transcription(self, transcript_id: str) -> None:
         self.transcript_id = transcript_id
+        if self.status == MeetingStatus.DIARIZING:
+            return
         self._transition(MeetingStatus.DIARIZING)
         self.record_event(MeetingTranscribed(str(self.id), transcript_id))
 
     def complete_diarization(self) -> None:
         if self.transcript_id is None:
             raise InvariantViolationError("必须先完成转写才能进行说话人识别")
+        if self.status == MeetingStatus.SUMMARIZING:
+            return
         self._transition(MeetingStatus.SUMMARIZING)
         self.record_event(MeetingDiarized(str(self.id), self.transcript_id))
 
     def complete_summarization(self, summary_id: str) -> None:
         self.summary_id = summary_id
+        if self.status == MeetingStatus.COMPLETED:
+            return
         self._transition(MeetingStatus.COMPLETED)
         self.record_event(MeetingSummarized(str(self.id), summary_id))
 
     def fail(self, stage: str, reason: str) -> None:
+        self.resume_status = self.status.value
+        self.failed_stage = stage
         self.status = MeetingStatus.FAILED
         self.error_message = reason
         self.updated_at = utcnow()
@@ -98,8 +116,21 @@ class Meeting(AggregateRoot[MeetingId]):
     def retry(self) -> None:
         if self.status != MeetingStatus.FAILED:
             raise InvalidStateTransitionError("Meeting", self.status.value, "retry")
+        target = self._resolve_retry_status()
         self.error_message = None
-        self._transition(MeetingStatus.TRANSCRIBING)
+        self.failed_stage = None
+        self.resume_status = None
+        self._transition(target)
+
+    def _resolve_retry_status(self) -> MeetingStatus:
+        """根据失败前状态与各阶段缓存产物，决定从哪一步继续处理。"""
+        if self.resume_status:
+            return MeetingStatus(self.resume_status)
+        if self.summary_id:
+            return MeetingStatus.COMPLETED
+        if self.transcript_id:
+            return MeetingStatus.DIARIZING
+        return MeetingStatus.UPLOADED
 
     def rename(self, new_title: str) -> None:
         if not new_title.strip():

@@ -36,7 +36,15 @@ class PyannoteDiarization(DiarizationPort):
             import torch
             from pyannote.audio import Pipeline
 
-            self._pipeline = Pipeline.from_pretrained(self._model_name, use_auth_token=self._hf_token)
+            load_kwargs: dict = {}
+            if self._hf_token:
+                load_kwargs["token"] = self._hf_token
+            try:
+                self._pipeline = Pipeline.from_pretrained(self._model_name, **load_kwargs)
+            except TypeError:
+                # 兼容旧版 huggingface_hub 参数名
+                legacy_kwargs = {"use_auth_token": self._hf_token} if self._hf_token else {}
+                self._pipeline = Pipeline.from_pretrained(self._model_name, **legacy_kwargs)
             self._pipeline.to(torch.device(self._device))
             logger.info("pyannote 模型加载完成")
 
@@ -44,11 +52,18 @@ class PyannoteDiarization(DiarizationPort):
     def is_loaded(self) -> bool:
         return self._pipeline is not None
 
+    async def preload(self) -> None:
+        await asyncio.to_thread(self._ensure_pipeline_loaded)
+
+    def _require_loaded(self) -> None:
+        if self._pipeline is None:
+            raise RuntimeError("pyannote 模型尚未下载，请前往设置页下载后再处理会议。")
+
     async def diarize(self, audio_path: str) -> list[SpeakerSegment]:
         return await asyncio.to_thread(self._diarize_sync, audio_path)
 
     def _diarize_sync(self, audio_path: str) -> list[SpeakerSegment]:
-        self._ensure_pipeline_loaded()
+        self._require_loaded()
         assert self._pipeline is not None
 
         diarization = self._pipeline(audio_path)

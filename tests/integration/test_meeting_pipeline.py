@@ -18,6 +18,7 @@ from memoflow.application.ports.llm_port import LLMPort
 from memoflow.application.pipeline.runner import AsyncioPipelineRunner
 from memoflow.application.summary_service import SummaryApplicationService
 from memoflow.application.transcription_service import TranscriptionApplicationService
+from memoflow.application.system_service import ModelService
 from memoflow.domain.meeting.value_objects import MeetingStatus
 from memoflow.domain.shared.events import EventDispatcher
 from memoflow.infrastructure.persistence.db import create_engine, create_session_factory, init_models
@@ -27,7 +28,10 @@ from memoflow.infrastructure.vectorstore.lancedb_repository import LanceDBVector
 
 
 class FakeASR(ASRPort):
+    call_count = 0
+
     async def transcribe(self, audio_path: str) -> ASRResult:
+        FakeASR.call_count += 1
         return ASRResult(
             language="zh",
             segments=[
@@ -67,8 +71,19 @@ class FakeEmbedding(EmbeddingPort):
         return 3
 
 
+class _BypassModelService(ModelService):
+    """集成测试用：跳过真实模型预检。"""
+
+    def ensure_processing_models_ready(self) -> None:
+        return
+
+    def get_missing_for_processing(self) -> list[str]:
+        return []
+
+
 @pytest.fixture()
 async def pipeline_context(tmp_path):
+    FakeASR.call_count = 0
     engine = create_engine(f"sqlite+aiosqlite:///{tmp_path}/test.db")
     await init_models(engine)
     session_factory = create_session_factory(engine)
@@ -85,20 +100,26 @@ async def pipeline_context(tmp_path):
     summary_service = SummaryApplicationService(uow_factory, FakeLLM(), llm_model_name="fake-llm")
     knowledge_service = KnowledgeApplicationService(uow_factory, FakeEmbedding(), vector_repository)
 
+    from memoflow.config import get_settings
+
+    model_service = _BypassModelService(
+        get_settings(), FakeASR(), FakeDiarization(), FakeLLM(), FakeEmbedding()
+    )
+
     pipeline = MeetingProcessingPipeline(
-        uow_factory, transcription_service, summary_service, knowledge_service
+        uow_factory, transcription_service, summary_service, knowledge_service, model_service
     )
     pipeline_runner = AsyncioPipelineRunner(pipeline)
     meeting_service = MeetingApplicationService(
         uow_factory, file_storage, EventDispatcher(), pipeline_runner
     )
 
-    yield meeting_service, transcription_service, summary_service, knowledge_service
+    yield meeting_service, transcription_service, summary_service, knowledge_service, uow_factory
     await engine.dispose()
 
 
 async def test_full_pipeline_completes_meeting(pipeline_context):
-    meeting_service, transcription_service, summary_service, knowledge_service = pipeline_context
+    meeting_service, transcription_service, summary_service, knowledge_service, _ = pipeline_context
 
     meeting = await meeting_service.upload_meeting(
         title="周会 0708",
@@ -107,7 +128,6 @@ async def test_full_pipeline_completes_meeting(pipeline_context):
         content=b"fake-audio-bytes",
     )
 
-    # 等待后台流水线（AsyncioPipelineRunner 内部通过 asyncio.create_task 调度）执行完成
     import asyncio
 
     for _ in range(50):
@@ -129,3 +149,50 @@ async def test_full_pipeline_completes_meeting(pipeline_context):
 
     hits = await knowledge_service.search(query="进度", meeting_id=meeting.id, top_k=3)
     assert len(hits) >= 1
+
+
+async def test_retry_resumes_from_diarization_without_rerunning_asr(pipeline_context):
+    import asyncio
+
+    from memoflow.domain.meeting.value_objects import MeetingId
+
+    meeting_service, _, _, _, uow_factory = pipeline_context
+
+    meeting = await meeting_service.upload_meeting(
+        title="断点续跑测试",
+        filename="meeting.wav",
+        content_type="audio/wav",
+        content=b"fake-audio-bytes",
+    )
+
+    for _ in range(50):
+        await asyncio.sleep(0.05)
+        meeting = await meeting_service.get_meeting(meeting.id)
+        if meeting.status in (MeetingStatus.COMPLETED, MeetingStatus.FAILED):
+            break
+
+    assert meeting.status == MeetingStatus.COMPLETED, meeting.error_message
+    asr_calls_after_first_run = FakeASR.call_count
+    assert asr_calls_after_first_run == 1
+
+    async with uow_factory() as uow:
+        m = await uow.meetings.get(MeetingId(meeting.id))
+        assert m is not None
+        m.status = MeetingStatus.DIARIZING
+        m.summary_id = None
+        m.fail(stage="diarization", reason="simulated pyannote failure")
+        await uow.meetings.save(m)
+        await uow.commit()
+
+    retried = await meeting_service.retry_meeting(meeting.id)
+    assert retried.status == MeetingStatus.DIARIZING
+    assert retried.transcript_id is not None
+
+    for _ in range(50):
+        await asyncio.sleep(0.05)
+        retried = await meeting_service.get_meeting(meeting.id)
+        if retried.status in (MeetingStatus.COMPLETED, MeetingStatus.FAILED):
+            break
+
+    assert retried.status == MeetingStatus.COMPLETED, retried.error_message
+    assert FakeASR.call_count == asr_calls_after_first_run

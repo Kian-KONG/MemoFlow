@@ -3,10 +3,10 @@ from __future__ import annotations
 
 from nicegui import ui
 
-from memoflow.application.system_service import SystemStatusService
+from memoflow.application.system_service import ModelService
 
 
-def render_system_status_panel(service: SystemStatusService) -> None:
+def render_system_status_panel(service: ModelService) -> None:
     """渲染系统依赖与模型状态卡片（可在仪表盘等页面复用）。"""
 
     status = service.get_status()
@@ -42,6 +42,7 @@ def render_system_status_panel(service: SystemStatusService) -> None:
                 ui.label(f"{model.status} — {model.hint}").classes(f"text-xs {color}")
 
     if not status.all_ready:
-        ui.label(
-            "部分依赖或模型尚未就绪，上传后处理可能失败。请根据上方提示完成配置后重试。"
-        ).classes("text-sm text-orange-600 mt-3 p-2 bg-orange-50 rounded")
+        ui.label("部分依赖或模型尚未就绪。").classes("text-sm text-orange-600 mt-3 p-2 bg-orange-50 rounded")
+        ui.button("前往设置页下载模型", on_click=lambda: ui.navigate.to("/settings")).props(
+            "outline color=primary"
+        ).classes("mt-2")

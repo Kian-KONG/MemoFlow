@@ -41,8 +41,14 @@ ALLOWED_TRANSITIONS: dict[MeetingStatus, set[MeetingStatus]] = {
     MeetingStatus.TRANSCRIBING: {MeetingStatus.DIARIZING, MeetingStatus.FAILED},
     MeetingStatus.DIARIZING: {MeetingStatus.SUMMARIZING, MeetingStatus.FAILED},
     MeetingStatus.SUMMARIZING: {MeetingStatus.COMPLETED, MeetingStatus.FAILED},
-    MeetingStatus.COMPLETED: set(),
-    MeetingStatus.FAILED: {MeetingStatus.TRANSCRIBING},  # 允许失败后重试
+    MeetingStatus.COMPLETED: {MeetingStatus.FAILED},
+    MeetingStatus.FAILED: {
+        MeetingStatus.UPLOADED,
+        MeetingStatus.TRANSCRIBING,
+        MeetingStatus.DIARIZING,
+        MeetingStatus.SUMMARIZING,
+        MeetingStatus.COMPLETED,
+    },
 }
 
 

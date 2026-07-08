@@ -5,11 +5,10 @@ from nicegui import events, ui
 
 from memoflow.container import AppContainer
 from memoflow.domain.meeting.services import AudioValidationPolicy
-from memoflow.interfaces.ui.components.system_status import render_system_status_panel
 
 _STATUS_LABELS = {
     "uploaded": "排队等待处理",
-    "transcribing": "转写中（可能正在下载/加载模型）",
+    "transcribing": "转写中",
     "diarizing": "说话人识别中",
     "summarizing": "生成摘要中",
     "completed": "已完成",
@@ -51,8 +50,21 @@ def register_dashboard_page(container: AppContainer) -> None:
                     )
 
     @ui.refreshable
-    def system_status_panel() -> None:
-        render_system_status_panel(container.system_service)
+    def readiness_banner() -> None:
+        status = container.system_service.get_status()
+        if status.all_ready:
+            return
+        missing = container.system_service.get_missing_for_processing()
+        with ui.row().classes("w-full items-center justify-between p-3 bg-orange-50 rounded"):
+            if missing:
+                ui.label(f"模型未就绪：{'、'.join(missing)}。请先在设置页下载模型。").classes(
+                    "text-sm text-orange-700"
+                )
+            else:
+                ui.label("部分系统依赖未就绪，请查看设置页。").classes("text-sm text-orange-700")
+            ui.button("前往设置", on_click=lambda: ui.navigate.to("/settings")).props(
+                "outline color=orange"
+            )
 
     @ui.page("/")
     async def dashboard() -> None:
@@ -60,16 +72,16 @@ def register_dashboard_page(container: AppContainer) -> None:
 
         with ui.header().classes("items-center justify-between"):
             ui.label("MemoFlow 本地 AI 会议助手").classes("text-xl font-bold")
+            ui.button(icon="settings", on_click=lambda: ui.navigate.to("/settings")).props(
+                "flat color=white"
+            ).tooltip("模型设置")
 
         with ui.column().classes("w-full max-w-4xl mx-auto p-4 gap-4"):
-            with ui.card().classes("w-full"):
-                system_status_panel()
+            readiness_banner()
 
             with ui.card().classes("w-full"):
                 ui.label("上传会议录音").classes("text-lg font-semibold")
-                ui.label(
-                    "上传成功后会自动跳转到处理进度页；首次处理需下载本地模型，可能耗时数分钟。"
-                ).classes("text-xs text-gray-500 mb-2")
+                ui.label("上传前请确保已在设置页下载全部模型。").classes("text-xs text-gray-500 mb-2")
                 title_input = ui.input("会议标题（可选）").classes("w-full")
                 upload_status = ui.label("").classes("text-sm text-gray-500")
 
@@ -77,6 +89,12 @@ def register_dashboard_page(container: AppContainer) -> None:
                     content = e.content.read()
                     upload_status.set_text("上传中，请稍候...")
                     try:
+                        missing = container.system_service.get_missing_for_processing()
+                        if missing:
+                            upload_status.set_text(
+                                f"无法上传：{'、'.join(missing)} 尚未下载，请前往设置页下载。"
+                            )
+                            return
                         normalized_type = AudioValidationPolicy.normalize_content_type(
                             e.type or "application/octet-stream", e.name
                         )
@@ -105,6 +123,6 @@ def register_dashboard_page(container: AppContainer) -> None:
 
         async def poll() -> None:
             await meetings_list.refresh()
-            system_status_panel.refresh()
+            readiness_banner.refresh()
 
         ui.timer(_POLL_INTERVAL_SECONDS, poll)

@@ -6,7 +6,7 @@ from fastapi import Request
 from memoflow.application.knowledge_service import KnowledgeApplicationService
 from memoflow.application.meeting_service import MeetingApplicationService
 from memoflow.application.summary_service import SummaryApplicationService
-from memoflow.application.system_service import SystemStatusService
+from memoflow.application.system_service import ModelKey, ModelService
 from memoflow.application.transcription_service import TranscriptionApplicationService
 from memoflow.container import AppContainer
 
@@ -31,5 +31,5 @@ def get_knowledge_service(request: Request) -> KnowledgeApplicationService:
     return get_container(request).knowledge_service
 
 
-def get_system_service(request: Request) -> SystemStatusService:
+def get_system_service(request: Request) -> ModelService:
     return get_container(request).system_service

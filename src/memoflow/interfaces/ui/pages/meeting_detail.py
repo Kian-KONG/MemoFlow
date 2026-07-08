@@ -11,7 +11,6 @@ from nicegui import ui
 
 from memoflow.container import AppContainer
 from memoflow.domain.shared.exceptions import EntityNotFoundError
-from memoflow.interfaces.ui.components.system_status import render_system_status_panel
 
 _STAGE_STEPS = ["uploaded", "transcribing", "diarizing", "summarizing", "completed"]
 _STAGE_LABELS = {
@@ -24,9 +23,9 @@ _STAGE_LABELS = {
 }
 _STAGE_HINTS = {
     "uploaded": "后台任务即将启动，请稍候…",
-    "transcribing": "首次运行会自动下载 SenseVoice 模型；长音频转写可能需要较长时间。",
-    "diarizing": "正在分析不同说话人的语音片段，首次运行会下载 pyannote 模型。",
-    "summarizing": "正在用本地 Qwen3 模型生成会议摘要，首次运行会下载模型（约数 GB）。",
+    "transcribing": "正在转写已下载的 SenseVoice 模型，长音频可能需要较长时间。",
+    "diarizing": "正在分析不同说话人的语音片段。",
+    "summarizing": "正在用本地 Qwen3 模型生成会议摘要。",
 }
 
 _POLL_INTERVAL_SECONDS = 2.0
@@ -95,6 +94,10 @@ def register_meeting_detail_page(container: AppContainer) -> None:
                 ui.label("处理失败").classes("text-red-600 font-medium")
             if meeting.error_message:
                 ui.label(f"错误信息: {meeting.error_message}").classes("text-sm text-red-500 mt-1")
+                if meeting.status.value == "failed":
+                    ui.label("重试将从上次成功的阶段继续，已完成的转写/摘要不要重新生成。").classes(
+                        "text-xs text-blue-600 mt-1"
+                    )
                 if "ffmpeg" in meeting.error_message.lower():
                     ui.label("提示: 请安装 ffmpeg（brew install ffmpeg）后点击重试。").classes(
                         "text-sm text-orange-600 mt-1"
@@ -184,17 +187,17 @@ def register_meeting_detail_page(container: AppContainer) -> None:
     async def meeting_detail(meeting_id: str) -> None:
         ui.page_title("MemoFlow - 会议详情")
 
-        with ui.header().classes("items-center"):
-            ui.button(icon="arrow_back", on_click=lambda: ui.navigate.to("/")).props("flat color=white")
-            ui.label("会议详情").classes("text-xl font-bold")
+        with ui.header().classes("items-center justify-between"):
+            with ui.row().classes("items-center"):
+                ui.button(icon="arrow_back", on_click=lambda: ui.navigate.to("/")).props("flat color=white")
+                ui.label("会议详情").classes("text-xl font-bold")
+            ui.button(icon="settings", on_click=lambda: ui.navigate.to("/settings")).props(
+                "flat color=white"
+            ).tooltip("模型设置")
 
         with ui.column().classes("w-full max-w-3xl mx-auto p-4 gap-4"):
             with ui.card().classes("w-full"):
                 await status_panel(meeting_id)
-
-            with ui.expansion("系统与模型状态", icon="settings").classes("w-full"):
-                with ui.card().classes("w-full"):
-                    render_system_status_panel(container.system_service)
 
             with ui.tabs().classes("w-full") as tabs:
                 tab_summary = ui.tab("摘要 / 决策 / 行动项")

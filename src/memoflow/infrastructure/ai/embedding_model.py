@@ -37,11 +37,18 @@ class SentenceTransformerEmbedding(EmbeddingPort):
     def is_loaded(self) -> bool:
         return self._model is not None
 
+    async def preload(self) -> None:
+        await asyncio.to_thread(self._ensure_model_loaded)
+
+    def _require_loaded(self) -> None:
+        if self._model is None:
+            raise RuntimeError("Embedding 模型尚未下载，请前往设置页下载后再处理会议。")
+
     async def embed(self, texts: list[str]) -> list[list[float]]:
         return await asyncio.to_thread(self._embed_sync, texts)
 
     def _embed_sync(self, texts: list[str]) -> list[list[float]]:
-        self._ensure_model_loaded()
+        self._require_loaded()
         assert self._model is not None
         vectors = self._model.encode(texts, normalize_embeddings=True, show_progress_bar=False)
         return [v.tolist() for v in vectors]
