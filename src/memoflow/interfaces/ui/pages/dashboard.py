@@ -4,14 +4,16 @@ from __future__ import annotations
 from nicegui import events, ui
 
 from memoflow.container import AppContainer
+from memoflow.domain.meeting.services import AudioValidationPolicy
+from memoflow.interfaces.ui.components.system_status import render_system_status_panel
 
 _STATUS_LABELS = {
-    "uploaded": "待处理",
-    "transcribing": "转写中",
+    "uploaded": "排队等待处理",
+    "transcribing": "转写中（可能正在下载/加载模型）",
     "diarizing": "说话人识别中",
     "summarizing": "生成摘要中",
     "completed": "已完成",
-    "failed": "失败",
+    "failed": "处理失败",
 }
 
 _STATUS_COLORS = {
@@ -23,7 +25,6 @@ _STATUS_COLORS = {
     "failed": "text-red-600",
 }
 
-# 轮询间隔（秒）：处理是后台异步进行的，列表需要定期刷新才能看到状态变化
 _POLL_INTERVAL_SECONDS = 2.0
 
 
@@ -38,13 +39,20 @@ def register_dashboard_page(container: AppContainer) -> None:
             with ui.row().classes(
                 "w-full items-center justify-between border rounded p-2 cursor-pointer hover:bg-gray-50"
             ).on("click", lambda _, mid=dto.id: ui.navigate.to(f"/meetings/{mid}")):
-                ui.label(dto.title).classes("font-medium")
-                with ui.row().classes("items-center gap-2"):
+                with ui.column().classes("gap-0 flex-grow"):
+                    ui.label(dto.title).classes("font-medium")
+                    if dto.status.value == "failed" and dto.error_message:
+                        ui.label(dto.error_message).classes("text-xs text-red-500 truncate max-w-md")
+                with ui.row().classes("items-center gap-2 shrink-0"):
                     if dto.status.value not in ("completed", "failed"):
                         ui.spinner(size="1em")
                     ui.label(_STATUS_LABELS.get(dto.status.value, dto.status.value)).classes(
                         f"text-sm {_STATUS_COLORS.get(dto.status.value, 'text-gray-500')}"
                     )
+
+    @ui.refreshable
+    def system_status_panel() -> None:
+        render_system_status_panel(container.system_service)
 
     @ui.page("/")
     async def dashboard() -> None:
@@ -55,7 +63,13 @@ def register_dashboard_page(container: AppContainer) -> None:
 
         with ui.column().classes("w-full max-w-4xl mx-auto p-4 gap-4"):
             with ui.card().classes("w-full"):
+                system_status_panel()
+
+            with ui.card().classes("w-full"):
                 ui.label("上传会议录音").classes("text-lg font-semibold")
+                ui.label(
+                    "上传成功后会自动跳转到处理进度页；首次处理需下载本地模型，可能耗时数分钟。"
+                ).classes("text-xs text-gray-500 mb-2")
                 title_input = ui.input("会议标题（可选）").classes("w-full")
                 upload_status = ui.label("").classes("text-sm text-gray-500")
 
@@ -63,16 +77,18 @@ def register_dashboard_page(container: AppContainer) -> None:
                     content = e.content.read()
                     upload_status.set_text("上传中，请稍候...")
                     try:
+                        normalized_type = AudioValidationPolicy.normalize_content_type(
+                            e.type or "application/octet-stream", e.name
+                        )
                         dto = await container.meeting_service.upload_meeting(
                             title=title_input.value,
                             filename=e.name,
-                            content_type=e.type or "application/octet-stream",
+                            content_type=normalized_type,
                             content=content,
                         )
                         upload_status.set_text(f"上传成功：{dto.title}，正在跳转到处理进度页面...")
                         title_input.set_value("")
-                        # 上传成功后直接跳转到会议详情页实时查看处理进度，
-                        # 避免用户停留在列表页却找不到处理结果在哪里查看
+                        await meetings_list.refresh()
                         ui.navigate.to(f"/meetings/{dto.id}")
                     except Exception as exc:  # noqa: BLE001 - 展示给用户的顶层错误兜底
                         upload_status.set_text(f"上传失败：{exc}")
@@ -87,5 +103,8 @@ def register_dashboard_page(container: AppContainer) -> None:
                     ui.label("每 2 秒自动刷新处理状态").classes("text-xs text-gray-400")
                 await meetings_list()
 
-        # 页面存在期间每 2 秒自动拉取一次最新状态，无需手动刷新即可看到"转写中 -> 生成摘要中 -> 已完成"的变化
-        ui.timer(_POLL_INTERVAL_SECONDS, meetings_list.refresh)
+        async def poll() -> None:
+            await meetings_list.refresh()
+            system_status_panel.refresh()
+
+        ui.timer(_POLL_INTERVAL_SECONDS, poll)

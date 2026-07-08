@@ -45,7 +45,7 @@ class MeetingProcessingPipeline:
             logger.info(f"[{meeting_id}] 流水线全部完成")
         except Exception as exc:  # noqa: BLE001 - 流水线顶层需要兜底捕获，避免后台任务静默失败
             logger.exception(f"[{meeting_id}] 流水线在阶段 [{stage}] 失败: {exc}")
-            await self._mark_failed(meeting_id, stage, str(exc))
+            await self._mark_failed(meeting_id, stage, _friendly_error(stage, str(exc)))
 
     async def _mark_failed(self, meeting_id: str, stage: str, reason: str) -> None:
         async with self._uow_factory() as uow:
@@ -55,3 +55,15 @@ class MeetingProcessingPipeline:
             meeting.fail(stage=stage, reason=reason)
             await uow.meetings.save(meeting)
             await uow.commit()
+
+
+def _friendly_error(stage: str, reason: str) -> str:
+    """将底层异常转为用户可理解的错误说明。"""
+    lower = reason.lower()
+    if "ffmpeg" in lower:
+        return "缺少 ffmpeg，无法解码 m4a/mp3 等音频。请运行 brew install ffmpeg 后点击「重试处理」。"
+    if "hf_token" in lower or "gated" in lower or "401" in reason:
+        return "pyannote 模型需要 HuggingFace Token。请在 .env 设置 MEMOFLOW_HF_TOKEN 并接受模型协议后重试。"
+    if "mlx" in lower or "metal" in lower:
+        return "摘要模型需要 Apple Silicon Mac 上的 MLX 环境。请确认在 M 系列 Mac 上运行。"
+    return f"[{stage}] {reason}"

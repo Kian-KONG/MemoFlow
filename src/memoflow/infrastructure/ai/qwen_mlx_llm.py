@@ -39,6 +39,10 @@ class QwenMLXLLM(LLMPort):
             self._model, self._tokenizer = load(self._model_path)
             logger.info("Qwen3 (MLX) 模型加载完成")
 
+    @property
+    def is_loaded(self) -> bool:
+        return self._model is not None
+
     async def generate(
         self,
         prompt: str,

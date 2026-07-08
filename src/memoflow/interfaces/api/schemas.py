@@ -84,3 +84,25 @@ class KnowledgeHitResponse(BaseModel):
 
 class ErrorResponse(BaseModel):
     detail: str
+
+
+class DependencyStatusResponse(BaseModel):
+    name: str
+    available: bool
+    hint: str
+
+
+class ModelStatusResponse(BaseModel):
+    role: str
+    model_id: str
+    loaded: bool
+    ready: bool
+    status: str
+    hint: str
+
+
+class SystemStatusResponse(BaseModel):
+    platform: str
+    all_ready: bool
+    dependencies: list[DependencyStatusResponse]
+    models: list[ModelStatusResponse]

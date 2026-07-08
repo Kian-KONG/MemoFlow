@@ -42,6 +42,10 @@ class SenseVoiceASR(ASRPort):
             )
             logger.info("SenseVoice 模型加载完成")
 
+    @property
+    def is_loaded(self) -> bool:
+        return self._model is not None
+
     async def transcribe(self, audio_path: str) -> ASRResult:
         return await asyncio.to_thread(self._transcribe_sync, audio_path)
 

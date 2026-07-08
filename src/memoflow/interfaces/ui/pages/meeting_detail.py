@@ -5,12 +5,15 @@
 """
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from nicegui import ui
 
 from memoflow.container import AppContainer
 from memoflow.domain.shared.exceptions import EntityNotFoundError
+from memoflow.interfaces.ui.components.system_status import render_system_status_panel
 
-_STAGE_STEPS = ["transcribing", "diarizing", "summarizing", "completed"]
+_STAGE_STEPS = ["uploaded", "transcribing", "diarizing", "summarizing", "completed"]
 _STAGE_LABELS = {
     "uploaded": "排队等待处理",
     "transcribing": "正在转写语音（SenseVoice）",
@@ -19,8 +22,28 @@ _STAGE_LABELS = {
     "completed": "处理完成",
     "failed": "处理失败",
 }
+_STAGE_HINTS = {
+    "uploaded": "后台任务即将启动，请稍候…",
+    "transcribing": "首次运行会自动下载 SenseVoice 模型；长音频转写可能需要较长时间。",
+    "diarizing": "正在分析不同说话人的语音片段，首次运行会下载 pyannote 模型。",
+    "summarizing": "正在用本地 Qwen3 模型生成会议摘要，首次运行会下载模型（约数 GB）。",
+}
 
 _POLL_INTERVAL_SECONDS = 2.0
+
+
+def _format_elapsed(started_at: datetime) -> str:
+    now = datetime.now(timezone.utc)
+    if started_at.tzinfo is None:
+        started_at = started_at.replace(tzinfo=timezone.utc)
+    seconds = int((now - started_at).total_seconds())
+    if seconds < 60:
+        return f"{seconds} 秒"
+    minutes, secs = divmod(seconds, 60)
+    if minutes < 60:
+        return f"{minutes} 分 {secs} 秒"
+    hours, minutes = divmod(minutes, 60)
+    return f"{hours} 小时 {minutes} 分"
 
 
 def _copy_button(text_getter) -> None:  # noqa: ANN001
@@ -54,9 +77,14 @@ def register_meeting_detail_page(container: AppContainer) -> None:
                 ui.spinner(size="1.2em", color="primary")
                 ui.label(_STAGE_LABELS.get(status, status)).classes("text-blue-600 font-medium")
             ui.linear_progress(value=(current_index + 1) / len(_STAGE_STEPS)).props("instant-feedback")
-            ui.label("处理完全在本地进行，无需联网；页面会每 2 秒自动刷新进度。").classes(
+            ui.label(f"已耗时: {_format_elapsed(meeting.updated_at)}").classes("text-xs text-gray-500 mt-1")
+            ui.label(_STAGE_HINTS.get(status, "处理完全在本地进行，页面会每 2 秒自动刷新进度。")).classes(
                 "text-xs text-gray-400 mt-1"
             )
+            if meeting.transcript_id:
+                ui.label("转写文本已部分生成，可切换到「转写文本」标签页查看。").classes(
+                    "text-xs text-green-600 mt-1"
+                )
         elif status == "completed":
             with ui.row().classes("items-center gap-2 mt-2"):
                 ui.icon("check_circle", color="green").classes("text-xl")
@@ -67,6 +95,10 @@ def register_meeting_detail_page(container: AppContainer) -> None:
                 ui.label("处理失败").classes("text-red-600 font-medium")
             if meeting.error_message:
                 ui.label(f"错误信息: {meeting.error_message}").classes("text-sm text-red-500 mt-1")
+                if "ffmpeg" in meeting.error_message.lower():
+                    ui.label("提示: 请安装 ffmpeg（brew install ffmpeg）后点击重试。").classes(
+                        "text-sm text-orange-600 mt-1"
+                    )
             ui.button(
                 "重试处理", on_click=lambda: _retry(container, meeting_id)
             ).props("outline color=red").classes("mt-2")
@@ -122,7 +154,7 @@ def register_meeting_detail_page(container: AppContainer) -> None:
         try:
             transcript = await container.transcription_service.get_transcript(meeting_id)
         except EntityNotFoundError:
-            ui.label("转写尚未完成，处理完成后会自动显示。").classes("text-gray-500")
+            ui.label("转写尚未完成，处理中会自动显示。").classes("text-gray-500")
             return
 
         def full_transcript_text() -> str:
@@ -160,6 +192,10 @@ def register_meeting_detail_page(container: AppContainer) -> None:
             with ui.card().classes("w-full"):
                 await status_panel(meeting_id)
 
+            with ui.expansion("系统与模型状态", icon="settings").classes("w-full"):
+                with ui.card().classes("w-full"):
+                    render_system_status_panel(container.system_service)
+
             with ui.tabs().classes("w-full") as tabs:
                 tab_summary = ui.tab("摘要 / 决策 / 行动项")
                 tab_transcript = ui.tab("转写文本")
@@ -177,7 +213,6 @@ def register_meeting_detail_page(container: AppContainer) -> None:
             await status_panel.refresh(meeting_id)
             meeting = await container.meeting_service.get_meeting(meeting_id)
             if meeting.transcript_id is not None:
-                # 转写在说话人识别阶段就已经产出（无需等摘要完成），尽早展示给用户
                 await transcript_panel.refresh(meeting_id)
             if meeting.status.value == "completed":
                 await summary_panel.refresh(meeting_id)

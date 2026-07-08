@@ -87,3 +87,10 @@ def test_audio_validation_rejects_unsupported_content_type():
 def test_audio_validation_accepts_wav():
     audio = _make_audio(content_type="audio/wav")
     AudioValidationPolicy.validate(audio)  # 不应抛出异常
+
+
+def test_normalize_content_type_from_m4a_extension():
+    normalized = AudioValidationPolicy.normalize_content_type("application/octet-stream", "meeting.m4a")
+    assert normalized == "audio/mp4"
+    audio = _make_audio(content_type=normalized, original_filename="meeting.m4a")
+    AudioValidationPolicy.validate(audio)

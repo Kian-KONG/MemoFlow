@@ -33,6 +33,10 @@ class SentenceTransformerEmbedding(EmbeddingPort):
             self._dimension = self._model.get_sentence_embedding_dimension()
             logger.info(f"Embedding 模型加载完成，维度={self._dimension}")
 
+    @property
+    def is_loaded(self) -> bool:
+        return self._model is not None
+
     async def embed(self, texts: list[str]) -> list[list[float]]:
         return await asyncio.to_thread(self._embed_sync, texts)
 

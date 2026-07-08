@@ -37,10 +37,11 @@ class MeetingApplicationService:
     ) -> MeetingDTO:
         """上传一段会议录音：保存文件、创建 Meeting 聚合、异步触发处理流水线。"""
         storage_path = await self._file_storage.save(filename, content)
+        normalized_type = AudioValidationPolicy.normalize_content_type(content_type, filename)
         audio = AudioFile(
             storage_path=storage_path,
             original_filename=filename,
-            content_type=content_type,
+            content_type=normalized_type,
             size_bytes=len(content),
         )
         AudioValidationPolicy.validate(audio)

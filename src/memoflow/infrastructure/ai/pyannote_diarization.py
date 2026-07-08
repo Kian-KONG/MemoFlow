@@ -40,6 +40,10 @@ class PyannoteDiarization(DiarizationPort):
             self._pipeline.to(torch.device(self._device))
             logger.info("pyannote 模型加载完成")
 
+    @property
+    def is_loaded(self) -> bool:
+        return self._pipeline is not None
+
     async def diarize(self, audio_path: str) -> list[SpeakerSegment]:
         return await asyncio.to_thread(self._diarize_sync, audio_path)
 
