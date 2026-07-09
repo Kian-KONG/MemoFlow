@@ -79,7 +79,7 @@ class SummaryApplicationService:
             if transcript is None:
                 raise EntityNotFoundError("Transcript", meeting.transcript_id)
 
-        logger.info(f"[{meeting_id}] 开始生成摘要（Qwen3-14B / MLX）...")
+        logger.info(f"[{meeting_id}] 开始生成摘要（{self._llm_model_name}）...")
         prompt = _USER_PROMPT_TEMPLATE.format(transcript_text=transcript.full_text)
         raw_output = await self._llm.generate(prompt=prompt, system_prompt=_SYSTEM_PROMPT)
         payload = self._parse_llm_output(raw_output)

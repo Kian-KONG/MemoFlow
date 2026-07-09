@@ -1,7 +1,7 @@
 [project]
 name = "memoflow"
 version = "0.1.0"
-description = "本地部署的 AI 会议助手 —— 转写 / 说话人识别 / 摘要 / 决策与行动项提取 / 知识库检索"
+description = "AI 会议助手 —— VibeVoice 本地转写 + DeepSeek/OpenAI/Qwen3 API 摘要与检索"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
@@ -23,10 +23,10 @@ dependencies = [
     "pyarrow>=16.0.0",
 
     # --- AI / ML (adapters lazily import these, see infrastructure/ai) ---
-    "funasr>=1.1.0",          # SenseVoice runtime
-    "pyannote.audio>=3.3.0",  # speaker diarization
-    "mlx-lm>=0.14.0",         # Qwen3-14B on Apple Silicon (MLX)
-    "sentence-transformers>=3.0.0",  # embeddings for knowledge base
+    "openai>=1.40.0",
+    "httpx>=0.27.0",
+    "transformers>=4.50.0",
+    "torch>=2.0.0",
     "soundfile>=0.12.1",
     "librosa>=0.10.2",
 
@@ -40,7 +40,6 @@ dependencies = [
 dev = [
     "pytest>=8.2.0",
     "pytest-asyncio>=0.23.7",
-    "httpx>=0.27.0",
     "ruff>=0.5.0",
     "mypy>=1.10.0",
 ]

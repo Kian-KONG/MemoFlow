@@ -15,17 +15,17 @@ from memoflow.domain.shared.exceptions import EntityNotFoundError
 _STAGE_STEPS = ["uploaded", "transcribing", "diarizing", "summarizing", "completed"]
 _STAGE_LABELS = {
     "uploaded": "排队等待处理",
-    "transcribing": "正在转写语音（SenseVoice）",
-    "diarizing": "正在识别说话人（pyannote）",
-    "summarizing": "正在生成摘要（Qwen3-14B）",
+    "transcribing": "正在转写语音（VibeVoice）",
+    "diarizing": "正在识别说话人（VibeVoice）",
+    "summarizing": "正在生成摘要（DeepSeek）",
     "completed": "处理完成",
     "failed": "处理失败",
 }
 _STAGE_HINTS = {
     "uploaded": "后台任务即将启动，请稍候…",
-    "transcribing": "正在转写已下载的 SenseVoice 模型，长音频可能需要较长时间。",
-    "diarizing": "正在分析不同说话人的语音片段。",
-    "summarizing": "正在用本地 Qwen3 模型生成会议摘要。",
+    "transcribing": "正在用 VibeVoice 模型转写语音并标注说话人，长音频可能需要较长时间。",
+    "diarizing": "VibeVoice 已在转写阶段标注说话人，正在推进处理状态。",
+    "summarizing": "正在通过 DeepSeek API 生成会议摘要。",
 }
 
 _POLL_INTERVAL_SECONDS = 2.0

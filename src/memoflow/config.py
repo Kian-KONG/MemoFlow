@@ -23,22 +23,28 @@ class Settings(BaseSettings):
     lancedb_dir: Path = Path("./data/lancedb")
     audio_dir: Path = Path("./data/audio")
 
-    # ASR: SenseVoice (FunASR)
-    asr_model: str = "iic/SenseVoiceSmall"
-    asr_device: str = "cpu"
+    # VibeVoice ASR（本地权重，通过 scripts/download_vibevoice_asr.sh 下载）
+    asr_model_path: Path = Path("./models/VibeVoice-ASR")
+    asr_device: str = "auto"  # auto|cpu|mps|cuda
 
-    # Diarization: pyannote
-    diarization_model: str = "pyannote/speaker-diarization-3.1"
-    hf_token: str = ""
-
-    # LLM: Qwen3-14B (MLX)
-    llm_model_path: str = "mlx-community/Qwen3-14B-4bit"
-    llm_max_tokens: int = 2048
+    # DeepSeek LLM
+    deepseek_api_key: str = ""
+    deepseek_base_url: str = "https://api.deepseek.com"
+    deepseek_model: str = "deepseek-v4-pro"
+    llm_max_tokens: int = 4096
     llm_temperature: float = 0.3
 
-    # Embedding
-    embedding_model: str = "BAAI/bge-small-zh-v1.5"
-    embedding_device: str = "cpu"
+    # OpenAI Embedding
+    openai_api_key: str = ""
+    openai_base_url: str = "https://api.openai.com/v1"
+    embedding_model: str = "text-embedding-3-small"
+    embedding_dimensions: int | None = None
+
+    # Qwen3 Reranker（DashScope 兼容 API）
+    rerank_api_key: str = ""
+    rerank_base_url: str = "https://dashscope.aliyuncs.com/compatible-api/v1"
+    rerank_model: str = "qwen3-rerank"
+    rerank_top_n: int = 5
 
     def ensure_directories(self) -> None:
         for path in (self.data_dir, self.lancedb_dir, self.audio_dir):

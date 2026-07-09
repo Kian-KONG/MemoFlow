@@ -1,7 +1,7 @@
 """系统状态与模型下载 API。"""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 
 from memoflow.application.system_service import ModelKey, ModelService
 from memoflow.interfaces.api.deps import get_system_service
@@ -13,6 +13,8 @@ from memoflow.interfaces.api.schemas import (
 )
 
 router = APIRouter(prefix="/api/system", tags=["system"])
+
+_DOWNLOAD_MESSAGE = "模型下载已改为脚本方式，请运行: ./scripts/download_vibevoice_asr.sh"
 
 
 def _to_response(service: ModelService) -> SystemStatusResponse:
@@ -54,19 +56,23 @@ async def get_system_status(
 @router.post(
     "/models/{model_key}/download",
     response_model=ModelDownloadResponse,
-    summary="下载并加载指定模型",
+    summary="（已弃用）下载并加载指定模型",
+    deprecated=True,
 )
 async def download_model(
-    model_key: ModelKey,
-    service: ModelService = Depends(get_system_service),
+    model_key: ModelKey,  # noqa: ARG001
+    service: ModelService = Depends(get_system_service),  # noqa: ARG001
 ) -> ModelDownloadResponse:
-    await service.download_model(model_key)
-    return ModelDownloadResponse(key=model_key.value, message="模型下载完成")
+    raise HTTPException(status_code=400, detail=_DOWNLOAD_MESSAGE)
 
 
-@router.post("/models/download-all", response_model=SystemStatusResponse, summary="下载全部可用模型")
+@router.post(
+    "/models/download-all",
+    response_model=SystemStatusResponse,
+    summary="（已弃用）下载全部可用模型",
+    deprecated=True,
+)
 async def download_all_models(
-    service: ModelService = Depends(get_system_service),
+    service: ModelService = Depends(get_system_service),  # noqa: ARG001
 ) -> SystemStatusResponse:
-    await service.download_all()
-    return _to_response(service)
+    raise HTTPException(status_code=400, detail=_DOWNLOAD_MESSAGE)
