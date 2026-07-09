@@ -99,6 +99,10 @@ class ModelStatusResponse(BaseModel):
     loaded: bool
     ready: bool
     downloading: bool
+    source: str
+    progress_percent: float
+    progress_message: str
+    recent_logs: list[str]
     status: str
     hint: str
 

@@ -32,6 +32,10 @@ def _to_response(service: ModelService) -> SystemStatusResponse:
                 loaded=m.loaded,
                 ready=m.ready,
                 downloading=m.downloading,
+                source=m.source,
+                progress_percent=m.progress_percent,
+                progress_message=m.progress_message,
+                recent_logs=m.recent_logs,
                 status=m.status,
                 hint=m.hint,
             )

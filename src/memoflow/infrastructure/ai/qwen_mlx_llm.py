@@ -11,6 +11,10 @@ import threading
 from loguru import logger
 
 from memoflow.application.ports.llm_port import LLMPort
+from memoflow.infrastructure.ai.modelscope_download import snapshot_download_with_progress
+from memoflow.infrastructure.ai.progress import ProgressCallback, report_progress
+
+_SOURCE = "ModelScope"
 
 
 class QwenMLXLLM(LLMPort):
@@ -26,25 +30,39 @@ class QwenMLXLLM(LLMPort):
         self._model = None
         self._tokenizer = None
         self._load_lock = threading.Lock()
+        self._local_model_path: str | None = None
 
-    def _ensure_model_loaded(self) -> None:
+    @property
+    def source(self) -> str:
+        return _SOURCE
+
+    def _ensure_model_loaded(self, on_progress: ProgressCallback = None) -> None:
         if self._model is not None:
             return
         with self._load_lock:
             if self._model is not None:
                 return
+            report_progress(on_progress, 5, f"连接 ModelScope · {self._model_path}")
+            self._local_model_path = snapshot_download_with_progress(
+                self._model_path,
+                on_progress,
+                progress_range=(10, 85),
+                label=self._model_path,
+            )
+            report_progress(on_progress, 90, "下载完成，开始加载 Qwen3...")
             logger.info(f"加载 Qwen3 (MLX) 模型: {self._model_path} ...")
             from mlx_lm import load
 
-            self._model, self._tokenizer = load(self._model_path)
+            self._model, self._tokenizer = load(self._local_model_path or self._model_path)
+            report_progress(on_progress, 100, "Qwen3 已就绪")
             logger.info("Qwen3 (MLX) 模型加载完成")
 
     @property
     def is_loaded(self) -> bool:
         return self._model is not None
 
-    async def preload(self) -> None:
-        await asyncio.to_thread(self._ensure_model_loaded)
+    async def preload(self, on_progress: ProgressCallback = None) -> None:
+        await asyncio.to_thread(self._ensure_model_loaded, on_progress)
 
     def _require_loaded(self) -> None:
         if self._model is None:

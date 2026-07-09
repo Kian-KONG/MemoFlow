@@ -4,7 +4,7 @@ from __future__ import annotations
 import asyncio
 import platform
 import shutil
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 
 from memoflow.application.ports.asr_port import ASRPort
@@ -40,8 +40,12 @@ class ModelStatus:
     loaded: bool
     ready: bool
     downloading: bool
+    source: str
+    progress_percent: float
+    progress_message: str
     status: str
     hint: str
+    recent_logs: list[str] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -72,6 +76,7 @@ class ModelService:
         self._embedding = embedding
         self._downloading: set[ModelKey] = set()
         self._download_lock = asyncio.Lock()
+        self._progress: dict[ModelKey, tuple[float, str, list[str]]] = {}
 
     def get_status(self) -> SystemStatusDTO:
         dependencies = self._check_dependencies()
@@ -116,10 +121,13 @@ class ModelService:
             if key in self._downloading:
                 return
             self._downloading.add(key)
+            self._set_progress(key, 0.0, "准备开始下载...")
         try:
             await self._preload(key)
+            self._set_progress(key, 100.0, "模型已就绪")
         except Exception as exc:
             message = str(exc)
+            self._append_log(key, f"失败: {message}")
             if "connection" in message.lower() or "timeout" in message.lower():
                 raise RuntimeError(
                     f"网络连接中断或超时，请检查网络后重试。详情: {message}"
@@ -144,7 +152,7 @@ class ModelService:
         adapter = self._adapter_for(key)
         if not hasattr(adapter, "preload"):
             raise RuntimeError(f"模型 {key.value} 不支持预下载")
-        await adapter.preload()  # type: ignore[attr-defined]
+        await adapter.preload(lambda percent, message: self._set_progress(key, percent, message))  # type: ignore[attr-defined]
 
     def _adapter_for(self, key: ModelKey):  # noqa: ANN202
         return {
@@ -175,6 +183,7 @@ class ModelService:
                 self._settings.asr_model,
                 isinstance(self._asr, SenseVoiceASR) and self._asr.is_loaded,
                 True,
+                getattr(self._asr, "source", "ModelScope"),
                 "已就绪" if isinstance(self._asr, SenseVoiceASR) and self._asr.is_loaded else "未下载",
                 "在设置页点击下载，从 ModelScope 拉取 SenseVoice 模型",
             ),
@@ -184,6 +193,7 @@ class ModelService:
                 self._settings.diarization_model,
                 isinstance(self._diarization, PyannoteDiarization) and self._diarization.is_loaded,
                 hf_configured,
+                getattr(self._diarization, "source", "HuggingFace"),
                 (
                     "已就绪"
                     if isinstance(self._diarization, PyannoteDiarization) and self._diarization.is_loaded
@@ -201,6 +211,7 @@ class ModelService:
                 self._settings.llm_model_path,
                 isinstance(self._llm, QwenMLXLLM) and self._llm.is_loaded,
                 mlx_available,
+                getattr(self._llm, "source", "ModelScope"),
                 (
                     "已就绪"
                     if isinstance(self._llm, QwenMLXLLM) and self._llm.is_loaded
@@ -218,6 +229,7 @@ class ModelService:
                 self._settings.embedding_model,
                 isinstance(self._embedding, SentenceTransformerEmbedding) and self._embedding.is_loaded,
                 True,
+                getattr(self._embedding, "source", "ModelScope"),
                 (
                     "已就绪"
                     if isinstance(self._embedding, SentenceTransformerEmbedding) and self._embedding.is_loaded
@@ -234,11 +246,27 @@ class ModelService:
                 loaded=loaded,
                 ready=ready,
                 downloading=key in self._downloading,
+                source=source,
+                progress_percent=self._progress.get(key, (100.0 if loaded else 0.0, "", []))[0],
+                progress_message=self._progress.get(key, (100.0 if loaded else 0.0, "", []))[1],
+                recent_logs=list(self._progress.get(key, (0.0, "", []))[2]),
                 status=status,
                 hint=hint,
             )
-            for key, role, model_id, loaded, ready, status, hint in specs
+            for key, role, model_id, loaded, ready, source, status, hint in specs
         ]
+
+    def _set_progress(self, key: ModelKey, percent: float, message: str) -> None:
+        _, _, logs = self._progress.get(key, (0.0, "", []))
+        next_logs = [*logs]
+        if not next_logs or next_logs[-1] != message:
+            next_logs.append(message)
+        self._progress[key] = (percent, message, next_logs[-8:])
+
+    def _append_log(self, key: ModelKey, message: str) -> None:
+        percent, current, logs = self._progress.get(key, (0.0, "", []))
+        next_logs = [*logs, message]
+        self._progress[key] = (percent, current, next_logs[-8:])
 
 
 # 兼容旧名称

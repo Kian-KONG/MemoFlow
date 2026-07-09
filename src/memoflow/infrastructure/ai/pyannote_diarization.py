@@ -8,9 +8,13 @@ from __future__ import annotations
 import asyncio
 import threading
 
+from huggingface_hub import snapshot_download
 from loguru import logger
 
 from memoflow.application.ports.diarization_port import DiarizationPort, SpeakerSegment
+from memoflow.infrastructure.ai.progress import ProgressCallback, report_progress
+
+_SOURCE = "HuggingFace"
 
 
 class PyannoteDiarization(DiarizationPort):
@@ -26,12 +30,24 @@ class PyannoteDiarization(DiarizationPort):
         self._pipeline = None
         self._load_lock = threading.Lock()
 
-    def _ensure_pipeline_loaded(self) -> None:
+    @property
+    def source(self) -> str:
+        return _SOURCE
+
+    def _ensure_pipeline_loaded(self, on_progress: ProgressCallback = None) -> None:
         if self._pipeline is not None:
             return
         with self._load_lock:
             if self._pipeline is not None:
                 return
+            report_progress(on_progress, 5, f"连接 HuggingFace · {self._model_name}")
+            report_progress(on_progress, 20, "开始下载 pyannote 模型文件...")
+            snapshot_download(
+                repo_id=self._model_name,
+                token=self._hf_token,
+                resume_download=True,
+            )
+            report_progress(on_progress, 85, "下载完成，开始加载 pyannote...")
             logger.info(f"加载 pyannote 说话人识别模型: {self._model_name} ...")
             import torch
             from pyannote.audio import Pipeline
@@ -46,14 +62,15 @@ class PyannoteDiarization(DiarizationPort):
                 legacy_kwargs = {"use_auth_token": self._hf_token} if self._hf_token else {}
                 self._pipeline = Pipeline.from_pretrained(self._model_name, **legacy_kwargs)
             self._pipeline.to(torch.device(self._device))
+            report_progress(on_progress, 100, "pyannote 已就绪")
             logger.info("pyannote 模型加载完成")
 
     @property
     def is_loaded(self) -> bool:
         return self._pipeline is not None
 
-    async def preload(self) -> None:
-        await asyncio.to_thread(self._ensure_pipeline_loaded)
+    async def preload(self, on_progress: ProgressCallback = None) -> None:
+        await asyncio.to_thread(self._ensure_pipeline_loaded, on_progress)
 
     def _require_loaded(self) -> None:
         if self._pipeline is None:

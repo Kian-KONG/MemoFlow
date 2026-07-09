@@ -47,8 +47,20 @@ def register_settings_page(container: AppContainer) -> None:
                     with ui.column().classes("gap-0 flex-grow"):
                         ui.label(model.role).classes("font-medium")
                         ui.label(model.model_id).classes("text-xs text-gray-400")
+                        ui.label(f"来源: {model.source}").classes("text-xs text-gray-400")
                         ui.label(model.hint).classes("text-xs text-gray-500 mt-1")
                     ui.badge(badge_text, color=badge_color)
+
+                if model.downloading or model.progress_percent > 0:
+                    progress_value = max(0.0, min(1.0, model.progress_percent / 100.0))
+                    ui.linear_progress(value=progress_value).classes("w-full mt-2")
+                    ui.label(
+                        model.progress_message or f"进度: {model.progress_percent:.0f}%"
+                    ).classes("text-xs text-blue-600 mt-1")
+                    if model.recent_logs:
+                        with ui.column().classes("gap-0 mt-1"):
+                            for line in model.recent_logs[-4:]:
+                                ui.label(f"· {line}").classes("text-xs text-gray-500")
 
                 if model.ready and not model.loaded:
                     if model.downloading:
