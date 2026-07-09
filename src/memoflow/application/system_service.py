@@ -1,4 +1,4 @@
-"""模型与依赖就绪检查：设置页展示 VibeVoice 本地模型与远程 API 密钥状态。"""
+"""模型与依赖就绪检查：设置页展示本地 ASR 模型与远程 API 密钥状态。"""
 from __future__ import annotations
 
 import platform
@@ -8,8 +8,9 @@ from enum import Enum
 
 from memoflow.application.ports.asr_port import ASRPort
 from memoflow.config import Settings
+from memoflow.infrastructure.ai.asr_defaults import default_asr_backend
 
-_DOWNLOAD_SCRIPT = "./scripts/download_vibevoice_asr.sh"
+_DOWNLOAD_SCRIPT = "./scripts/download_asr_model.sh"
 
 
 class ModelKey(str, Enum):
@@ -84,7 +85,7 @@ class ModelService:
             roles = "、".join(missing)
             raise ModelNotReadyError(
                 f"以下依赖尚未就绪：{roles}。"
-                f"请配置 API 密钥并运行 {_DOWNLOAD_SCRIPT} 下载 VibeVoice 模型。"
+                f"请配置 API 密钥并运行 {_DOWNLOAD_SCRIPT} 下载 ASR 模型。"
             )
 
     async def download_model(self, key: ModelKey) -> None:
@@ -140,24 +141,27 @@ class ModelService:
     def _check_models(self) -> list[ModelStatus]:
         files_present = self._asr_files_present()
         loaded = self._asr_loaded()
+        backend = self._settings.asr_backend or default_asr_backend()
+        model_id = self._settings.asr_model_id
         model_path = str(self._settings.asr_model_path)
+        role = self._asr_role_label(backend)
 
         if loaded:
-            status, hint = "已就绪", "VibeVoice 模型已加载到内存"
+            status, hint = "已就绪", f"{role} 已加载到内存"
         elif files_present:
             status, hint = "未加载", "模型文件已存在，处理会议时将自动加载"
         else:
-            status, hint = "未找到", f"请运行 {_DOWNLOAD_SCRIPT} 下载 VibeVoice 权重"
+            status, hint = "未找到", f"请运行 {_DOWNLOAD_SCRIPT} 下载权重"
 
         return [
             ModelStatus(
                 key=ModelKey.ASR,
-                role="语音识别 (VibeVoice ASR)",
-                model_id=model_path,
+                role=role,
+                model_id=model_id or model_path,
                 loaded=loaded,
                 ready=files_present,
                 downloading=False,
-                source="本地权重",
+                source=getattr(self._asr, "source", "本地权重"),
                 progress_percent=100.0 if loaded else 0.0,
                 progress_message="",
                 recent_logs=[],
@@ -165,6 +169,15 @@ class ModelService:
                 hint=hint,
             ),
         ]
+
+    @staticmethod
+    def _asr_role_label(backend: str) -> str:
+        labels = {
+            "mlx_moss": "语音识别 (MOSS MLX)",
+            "moss_hf": "语音识别 (MOSS HF)",
+            "vibevoice": "语音识别 (VibeVoice ASR)",
+        }
+        return labels.get(backend, f"语音识别 ({backend})")
 
     def _asr_files_present(self) -> bool:
         is_ready = getattr(self._asr, "is_ready", None)

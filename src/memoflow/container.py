@@ -29,7 +29,7 @@ from memoflow.domain.shared.events import EventDispatcher
 from memoflow.infrastructure.ai.deepseek_llm import DeepSeekLLM
 from memoflow.infrastructure.ai.openai_embedding import OpenAIEmbedding
 from memoflow.infrastructure.ai.qwen_reranker import QwenReranker
-from memoflow.infrastructure.ai.vibevoice_asr import VibeVoiceASR
+from memoflow.infrastructure.ai.asr_factory import build_asr
 from memoflow.infrastructure.persistence.db import create_engine, create_session_factory
 from memoflow.infrastructure.persistence.unit_of_work import SqlAlchemyUnitOfWork
 from memoflow.infrastructure.storage.file_storage import LocalFileStorage
@@ -73,7 +73,7 @@ def build_container(settings: Settings) -> AppContainer:
 
     # ---- 基础设施适配器（均可替换）----
     file_storage: FileStoragePort = LocalFileStorage(settings.audio_dir)
-    asr: ASRPort = VibeVoiceASR(model_path=settings.asr_model_path, device=settings.asr_device)
+    asr: ASRPort = build_asr(settings)
     llm: LLMPort = DeepSeekLLM(
         api_key=settings.resolved_llm_api_key,
         base_url=settings.resolved_llm_base_url,

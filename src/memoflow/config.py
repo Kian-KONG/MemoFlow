@@ -4,8 +4,14 @@ from __future__ import annotations
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from memoflow.infrastructure.ai.asr_defaults import (
+    default_asr_backend,
+    default_asr_model_id,
+    default_asr_model_path,
+)
 
 
 def _strip_api_suffix(url: str, suffix: str) -> str:
@@ -35,9 +41,36 @@ class Settings(BaseSettings):
     lancedb_dir: Path = Path("./data/lancedb")
     audio_dir: Path = Path("./data/audio")
 
-    # VibeVoice ASR（本地权重，通过 scripts/download_vibevoice_asr.sh 下载）
-    asr_model_path: Path = Path("./models/VibeVoice-ASR")
+    # ASR（本地权重，通过 scripts/download_asr_model.sh 下载）
+    # Mac Apple Silicon 默认 mlx_moss（~1.8GB）；其他平台默认 vibevoice
+    asr_backend: str = Field(default_factory=default_asr_backend)  # mlx_moss | moss_hf | vibevoice | auto
+    asr_model_id: str = Field(default="")
+    asr_model_path: Path = Field(default=Path("."))
     asr_device: str = "auto"  # auto|cpu|mps|cuda
+    asr_max_tokens: int = 4096
+
+    @field_validator("asr_model_id", mode="before")
+    @classmethod
+    def _fill_asr_model_id(cls, value: object, info) -> str:
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+        backend = info.data.get("asr_backend") if info.data else None
+        if backend == "auto" or not backend:
+            backend = default_asr_backend()
+        return default_asr_model_id(str(backend))
+
+    @field_validator("asr_model_path", mode="before")
+    @classmethod
+    def _fill_asr_model_path(cls, value: object, info) -> Path:
+        if value not in (None, "", "."):
+            return Path(value).expanduser()
+        backend = info.data.get("asr_backend") if info.data else None
+        if backend == "auto" or not backend:
+            backend = default_asr_backend()
+        model_id = info.data.get("asr_model_id") if info.data else None
+        if isinstance(model_id, str) and model_id.strip():
+            return Path(default_asr_model_path(str(backend), model_id.strip()))
+        return Path(default_asr_model_path(str(backend)))
 
     # DeepSeek LLM
     deepseek_api_key: str = ""

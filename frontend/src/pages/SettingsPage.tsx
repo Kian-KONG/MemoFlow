@@ -3,7 +3,7 @@ import { getSystemStatus } from '../api/system'
 import type { SystemStatus } from '../api/types'
 import './SettingsPage.css'
 
-const DOWNLOAD_SCRIPT = './scripts/download_vibevoice_asr.sh'
+const DOWNLOAD_SCRIPT = './scripts/download_asr_model.sh'
 
 export function SettingsPage() {
   const [status, setStatus] = useState<SystemStatus | null>(null)
@@ -37,7 +37,7 @@ export function SettingsPage() {
           </button>
         </div>
         <p className="settings-desc">
-          MemoFlow 使用 VibeVoice 本地 ASR + 远程 LLM / Embedding / Rerank API。请确保模型权重与
+          MemoFlow 使用 MOSS / VibeVoice 本地 ASR + 远程 LLM / Embedding / Rerank API。请确保模型权重与
           API 密钥均已就绪后再处理会议。
         </p>
         {error && <p className="settings-error">{error}</p>}
@@ -89,7 +89,7 @@ export function SettingsPage() {
             <strong>ffmpeg</strong>: 终端运行 <code>brew install ffmpeg</code>（处理 m4a/mp3 必需）
           </li>
           <li>
-            <strong>VibeVoice ASR</strong>: 运行 <code>{DOWNLOAD_SCRIPT}</code> 下载本地权重
+            <strong>ASR 模型</strong>: 运行 <code>{DOWNLOAD_SCRIPT}</code> 下载本地权重（Mac 默认 MOSS MLX ~1.8GB）
           </li>
           <li>
             <strong>Bosch AIGC</strong>: 在 <code>.env</code> 中设置 <code>BOSCH_AIGC_API_KEY</code>{' '}
