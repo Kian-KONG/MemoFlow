@@ -36,3 +36,9 @@ class SqlAlchemySummaryRepository(SummaryRepository):
         await self._session.delete(model)
         await self._session.flush()
         self._session.add(summary_to_model(summary))
+
+    async def delete_by_meeting_id(self, meeting_id: str) -> None:
+        stmt = select(SummaryModel).where(SummaryModel.meeting_id == meeting_id)
+        result = await self._session.execute(stmt)
+        for model in result.scalars().all():
+            await self._session.delete(model)

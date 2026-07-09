@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field, ValidationError
 from memoflow.application.dto import SummaryDTO
 from memoflow.application.ports.llm_port import LLMPort
 from memoflow.application.ports.unit_of_work import UnitOfWorkFactory
-from memoflow.domain.meeting.value_objects import MeetingId
+from memoflow.domain.meeting.value_objects import MeetingId, MeetingStatus
 from memoflow.domain.shared.exceptions import EntityNotFoundError
 from memoflow.domain.summary.entities import ActionItem, Decision, Summary
 from memoflow.domain.summary.value_objects import ActionItemId, DecisionId
@@ -64,6 +64,15 @@ class SummaryApplicationService:
             meeting = await uow.meetings.get(MeetingId(meeting_id))
             if meeting is None:
                 raise EntityNotFoundError("Meeting", meeting_id)
+            if meeting.summary_id is not None:
+                summary = await uow.summaries.get_by_meeting_id(meeting_id)
+                if summary is not None:
+                    logger.info(f"[{meeting_id}] 跳过摘要生成，使用已有摘要缓存")
+                    if meeting.status == MeetingStatus.SUMMARIZING:
+                        meeting.complete_summarization(meeting.summary_id)
+                        await uow.meetings.save(meeting)
+                        await uow.commit()
+                    return SummaryDTO.from_domain(summary)
             if meeting.transcript_id is None:
                 raise EntityNotFoundError("Transcript", "(meeting has no transcript yet)")
             transcript = await uow.transcripts.get(TranscriptId(meeting.transcript_id))

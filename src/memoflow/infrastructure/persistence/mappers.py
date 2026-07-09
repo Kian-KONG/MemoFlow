@@ -41,6 +41,8 @@ def meeting_to_domain(model: MeetingModel) -> Meeting:
         transcript_id=model.transcript_id,
         summary_id=model.summary_id,
         error_message=model.error_message,
+        failed_stage=model.failed_stage,
+        resume_status=model.resume_status,
     )
 
 
@@ -59,6 +61,8 @@ def meeting_to_model(meeting: Meeting) -> MeetingModel:
         transcript_id=meeting.transcript_id,
         summary_id=meeting.summary_id,
         error_message=meeting.error_message,
+        failed_stage=meeting.failed_stage,
+        resume_status=meeting.resume_status,
     )
 
 
@@ -71,6 +75,8 @@ def apply_meeting_to_model(meeting: Meeting, model: MeetingModel) -> None:
     model.transcript_id = meeting.transcript_id
     model.summary_id = meeting.summary_id
     model.error_message = meeting.error_message
+    model.failed_stage = meeting.failed_stage
+    model.resume_status = meeting.resume_status
 
 
 # ---------------------------------------------------------------------------

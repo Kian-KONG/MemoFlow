@@ -19,3 +19,6 @@ class TranscriptRepository(ABC):
 
     @abstractmethod
     async def save(self, transcript: Transcript) -> None: ...
+
+    @abstractmethod
+    async def delete_by_meeting_id(self, meeting_id: str) -> None: ...

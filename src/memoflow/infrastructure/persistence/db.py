@@ -24,3 +24,20 @@ async def init_models(engine: AsyncEngine) -> None:
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(_migrate_meetings_table)
+
+
+def _migrate_meetings_table(connection) -> None:  # noqa: ANN001
+    """为已有 SQLite 数据库补充新增列（create_all 不会修改已存在的表）。"""
+    from sqlalchemy import inspect, text
+
+    inspector = inspect(connection)
+    if "meetings" not in inspector.get_table_names():
+        return
+    existing = {col["name"] for col in inspector.get_columns("meetings")}
+    for column, ddl in (
+        ("failed_stage", "ALTER TABLE meetings ADD COLUMN failed_stage VARCHAR"),
+        ("resume_status", "ALTER TABLE meetings ADD COLUMN resume_status VARCHAR"),
+    ):
+        if column not in existing:
+            connection.execute(text(ddl))

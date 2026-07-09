@@ -8,9 +8,13 @@ from __future__ import annotations
 import asyncio
 import threading
 
+from huggingface_hub import snapshot_download
 from loguru import logger
 
 from memoflow.application.ports.diarization_port import DiarizationPort, SpeakerSegment
+from memoflow.infrastructure.ai.progress import ProgressCallback, report_progress
+
+_SOURCE = "HuggingFace"
 
 
 class PyannoteDiarization(DiarizationPort):
@@ -26,25 +30,57 @@ class PyannoteDiarization(DiarizationPort):
         self._pipeline = None
         self._load_lock = threading.Lock()
 
-    def _ensure_pipeline_loaded(self) -> None:
+    @property
+    def source(self) -> str:
+        return _SOURCE
+
+    def _ensure_pipeline_loaded(self, on_progress: ProgressCallback = None) -> None:
         if self._pipeline is not None:
             return
         with self._load_lock:
             if self._pipeline is not None:
                 return
+            report_progress(on_progress, 5, f"连接 HuggingFace · {self._model_name}")
+            report_progress(on_progress, 20, "开始下载 pyannote 模型文件...")
+            snapshot_download(
+                repo_id=self._model_name,
+                token=self._hf_token,
+                resume_download=True,
+            )
+            report_progress(on_progress, 85, "下载完成，开始加载 pyannote...")
             logger.info(f"加载 pyannote 说话人识别模型: {self._model_name} ...")
             import torch
             from pyannote.audio import Pipeline
 
-            self._pipeline = Pipeline.from_pretrained(self._model_name, use_auth_token=self._hf_token)
+            load_kwargs: dict = {}
+            if self._hf_token:
+                load_kwargs["token"] = self._hf_token
+            try:
+                self._pipeline = Pipeline.from_pretrained(self._model_name, **load_kwargs)
+            except TypeError:
+                # 兼容旧版 huggingface_hub 参数名
+                legacy_kwargs = {"use_auth_token": self._hf_token} if self._hf_token else {}
+                self._pipeline = Pipeline.from_pretrained(self._model_name, **legacy_kwargs)
             self._pipeline.to(torch.device(self._device))
+            report_progress(on_progress, 100, "pyannote 已就绪")
             logger.info("pyannote 模型加载完成")
+
+    @property
+    def is_loaded(self) -> bool:
+        return self._pipeline is not None
+
+    async def preload(self, on_progress: ProgressCallback = None) -> None:
+        await asyncio.to_thread(self._ensure_pipeline_loaded, on_progress)
+
+    def _require_loaded(self) -> None:
+        if self._pipeline is None:
+            raise RuntimeError("pyannote 模型尚未下载，请前往设置页下载后再处理会议。")
 
     async def diarize(self, audio_path: str) -> list[SpeakerSegment]:
         return await asyncio.to_thread(self._diarize_sync, audio_path)
 
     def _diarize_sync(self, audio_path: str) -> list[SpeakerSegment]:
-        self._ensure_pipeline_loaded()
+        self._require_loaded()
         assert self._pipeline is not None
 
         diarization = self._pipeline(audio_path)
