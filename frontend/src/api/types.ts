@@ -97,9 +97,25 @@ export interface ModelStatus {
   hint: string
 }
 
+export interface AsrOptionStatus {
+  backend: string
+  label: string
+  model_id: string
+  model_path: string
+  ready: boolean
+  source: string
+  configured: boolean
+  active: boolean
+  download_command: string
+  hint: string
+}
+
 export interface SystemStatus {
   platform: string
   all_ready: boolean
+  configured_asr_backend: string
+  active_asr_backend: string
   dependencies: DependencyStatus[]
   models: ModelStatus[]
+  asr_options: AsrOptionStatus[]
 }

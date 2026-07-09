@@ -92,6 +92,19 @@ class DependencyStatusResponse(BaseModel):
     hint: str
 
 
+class AsrOptionStatusResponse(BaseModel):
+    backend: str
+    label: str
+    model_id: str
+    model_path: str
+    ready: bool
+    source: str
+    configured: bool
+    active: bool
+    download_command: str
+    hint: str
+
+
 class ModelStatusResponse(BaseModel):
     key: str
     role: str
@@ -115,5 +128,8 @@ class ModelDownloadResponse(BaseModel):
 class SystemStatusResponse(BaseModel):
     platform: str
     all_ready: bool
+    configured_asr_backend: str = ""
+    active_asr_backend: str = ""
     dependencies: list[DependencyStatusResponse]
     models: list[ModelStatusResponse]
+    asr_options: list[AsrOptionStatusResponse] = []

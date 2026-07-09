@@ -3,8 +3,6 @@ import { getSystemStatus } from '../api/system'
 import type { SystemStatus } from '../api/types'
 import './SettingsPage.css'
 
-const DOWNLOAD_SCRIPT = './scripts/download_asr_model.sh'
-
 export function SettingsPage() {
   const [status, setStatus] = useState<SystemStatus | null>(null)
   const [loading, setLoading] = useState(true)
@@ -37,8 +35,8 @@ export function SettingsPage() {
           </button>
         </div>
         <p className="settings-desc">
-          MemoFlow 使用 MOSS / VibeVoice 本地 ASR + 远程 LLM / Embedding / Rerank API。请确保模型权重与
-          API 密钥均已就绪后再处理会议。
+          MemoFlow 使用 MOSS / VibeVoice 本地 ASR + 远程 LLM / Embedding / Rerank API。ASR
+          后端在 <code>.env</code> 中通过 <code>MEMOFLOW_ASR_BACKEND</code> 切换，修改后需重启服务。
         </p>
         {error && <p className="settings-error">{error}</p>}
         {status && (
@@ -59,7 +57,36 @@ export function SettingsPage() {
               ))}
             </ul>
 
-            <h3>本地模型</h3>
+            <h3>ASR 模型（可选后端）</h3>
+            <p className="settings-desc">
+              配置: <code>{status.configured_asr_backend || 'auto'}</code> · 当前运行:{' '}
+              <code>{status.active_asr_backend}</code>
+            </p>
+            <div className="asr-options">
+              {status.asr_options.map((opt) => (
+                <div
+                  key={opt.backend}
+                  className={`asr-option ${opt.active ? 'active' : ''} ${opt.ready ? 'ready' : 'missing'}`}
+                >
+                  <div className="asr-option-top">
+                    <div>
+                      <strong>{opt.label}</strong>
+                      {opt.configured && <span className="badge neutral">已配置</span>}
+                      {opt.active && <span className="badge ok">运行中</span>}
+                      <p className="muted">{opt.model_id}</p>
+                      <p className="muted">路径: {opt.model_path}</p>
+                      <p className="muted">{opt.hint}</p>
+                    </div>
+                    <span className={`badge ${opt.ready ? 'ok' : 'warn'}`}>
+                      {opt.ready ? '权重就绪' : '未下载'}
+                    </span>
+                  </div>
+                  {!opt.ready && <pre className="download-hint">{opt.download_command}</pre>}
+                </div>
+              ))}
+            </div>
+
+            <h3>当前 ASR 实例</h3>
             {status.models.map((model) => (
               <div key={model.key} className="model-card">
                 <div className="model-top">
@@ -73,9 +100,6 @@ export function SettingsPage() {
                     {model.loaded ? '已就绪' : model.ready ? '未加载' : '未找到'}
                   </span>
                 </div>
-                {!model.ready && (
-                  <pre className="download-hint">{`chmod +x ${DOWNLOAD_SCRIPT}\n${DOWNLOAD_SCRIPT}`}</pre>
-                )}
               </div>
             ))}
           </>
@@ -89,15 +113,20 @@ export function SettingsPage() {
             <strong>ffmpeg</strong>: 终端运行 <code>brew install ffmpeg</code>（处理 m4a/mp3 必需）
           </li>
           <li>
-            <strong>ASR 模型</strong>: 运行 <code>{DOWNLOAD_SCRIPT}</code> 下载本地权重（Mac 默认 MOSS MLX ~1.8GB）
+            <strong>MOSS MLX</strong>: <code>MEMOFLOW_ASR_BACKEND=mlx_moss</code> +{' '}
+            <code>./scripts/download_mlx_moss.sh</code>
           </li>
           <li>
-            <strong>Bosch AIGC</strong>: 在 <code>.env</code> 中设置 <code>BOSCH_AIGC_API_KEY</code>{' '}
-            与各 API URL
+            <strong>MOSS HF</strong>: <code>MEMOFLOW_ASR_BACKEND=moss_hf</code> +{' '}
+            <code>pip install -e &quot;.[moss-asr]&quot;</code> +{' '}
+            <code>MEMOFLOW_ASR_BACKEND=moss_hf ./scripts/download_asr_model.sh</code>
           </li>
           <li>
-            或分别配置 <code>MEMOFLOW_DEEPSEEK_API_KEY</code> / <code>MEMOFLOW_OPENAI_API_KEY</code> /{' '}
-            <code>MEMOFLOW_RERANK_API_KEY</code>
+            <strong>VibeVoice</strong>: <code>MEMOFLOW_ASR_BACKEND=vibevoice</code> +{' '}
+            <code>./scripts/download_vibevoice_asr.sh</code>
+          </li>
+          <li>
+            MLX 权重已下载时，即使 MLX 运行时未安装，也可设 <code>moss_hf</code> 使用同一目录权重
           </li>
         </ul>
       </section>

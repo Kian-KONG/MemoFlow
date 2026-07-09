@@ -4,7 +4,7 @@ from __future__ import annotations
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from memoflow.infrastructure.ai.asr_defaults import (
@@ -12,6 +12,7 @@ from memoflow.infrastructure.ai.asr_defaults import (
     default_asr_model_id,
     default_asr_model_path,
 )
+from memoflow.infrastructure.ai.asr_status import resolve_model_path
 
 
 def _strip_api_suffix(url: str, suffix: str) -> str:
@@ -71,6 +72,16 @@ class Settings(BaseSettings):
         if isinstance(model_id, str) and model_id.strip():
             return Path(default_asr_model_path(str(backend), model_id.strip()))
         return Path(default_asr_model_path(str(backend)))
+
+    @model_validator(mode="after")
+    def _align_asr_path_with_weights(self) -> Settings:
+        backend = (self.asr_backend or "auto").strip().lower()
+        if backend == "auto":
+            backend = default_asr_backend()
+        resolved = resolve_model_path(backend, self.asr_model_path)
+        if resolved != self.asr_model_path:
+            self.asr_model_path = resolved
+        return self
 
     # DeepSeek LLM
     deepseek_api_key: str = ""

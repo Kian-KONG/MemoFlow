@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from memoflow.application.system_service import ModelKey, ModelService
 from memoflow.interfaces.api.deps import get_system_service
 from memoflow.interfaces.api.schemas import (
+    AsrOptionStatusResponse,
     DependencyStatusResponse,
     ModelDownloadResponse,
     ModelStatusResponse,
@@ -14,7 +15,7 @@ from memoflow.interfaces.api.schemas import (
 
 router = APIRouter(prefix="/api/system", tags=["system"])
 
-_DOWNLOAD_MESSAGE = "模型下载已改为脚本方式，请运行: ./scripts/download_vibevoice_asr.sh"
+_DOWNLOAD_MESSAGE = "模型下载已改为脚本方式，请运行: ./scripts/download_asr_model.sh"
 
 
 def _to_response(service: ModelService) -> SystemStatusResponse:
@@ -22,6 +23,8 @@ def _to_response(service: ModelService) -> SystemStatusResponse:
     return SystemStatusResponse(
         platform=status.platform,
         all_ready=status.all_ready,
+        configured_asr_backend=status.configured_asr_backend,
+        active_asr_backend=status.active_asr_backend,
         dependencies=[
             DependencyStatusResponse(name=d.name, available=d.available, hint=d.hint)
             for d in status.dependencies
@@ -42,6 +45,21 @@ def _to_response(service: ModelService) -> SystemStatusResponse:
                 hint=m.hint,
             )
             for m in status.models
+        ],
+        asr_options=[
+            AsrOptionStatusResponse(
+                backend=o.backend,
+                label=o.label,
+                model_id=o.model_id,
+                model_path=o.model_path,
+                ready=o.ready,
+                source=o.source,
+                configured=o.configured,
+                active=o.active,
+                download_command=o.download_command,
+                hint=o.hint,
+            )
+            for o in status.asr_options
         ],
     )
 

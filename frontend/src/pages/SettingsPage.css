@@ -119,6 +119,38 @@
   margin-top: 0.5rem;
 }
 
+.asr-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.asr-option {
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 0.85rem;
+}
+
+.asr-option.active {
+  border-color: #34d399;
+  background: #f0fdf4;
+}
+
+.asr-option-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.asr-option-top .badge {
+  margin-left: 0.35rem;
+  vertical-align: middle;
+}
+
+.asr-option-top strong {
+  margin-right: 0.25rem;
+}
+
 .model-top {
   display: flex;
   justify-content: space-between;
