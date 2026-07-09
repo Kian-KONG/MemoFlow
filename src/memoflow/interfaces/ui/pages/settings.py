@@ -1,19 +1,17 @@
-"""设置页面：模型下载与管理（与会议处理流水线解耦）。"""
+"""设置页面：VibeVoice 本地模型与远程 API 密钥状态。"""
 from __future__ import annotations
-
-import asyncio
 
 from nicegui import ui
 
-from memoflow.application.system_service import ModelKey
 from memoflow.container import AppContainer
 
-_POLL_INTERVAL_SECONDS = 1.0
+_POLL_INTERVAL_SECONDS = 2.0
+_DOWNLOAD_SCRIPT = "./scripts/download_vibevoice_asr.sh"
 
 
 def register_settings_page(container: AppContainer) -> None:
     @ui.refreshable
-    def models_panel() -> None:
+    def status_panel() -> None:
         model_service = container.system_service
         status = model_service.get_status()
 
@@ -24,23 +22,23 @@ def register_settings_page(container: AppContainer) -> None:
             else:
                 ui.badge("尚未就绪", color="orange")
 
+        ui.label("系统依赖").classes("text-sm font-medium mt-2 mb-1")
         for dep in status.dependencies:
             color = "text-green-600" if dep.available else "text-red-600"
-            with ui.row().classes("w-full items-center gap-2 mb-2"):
+            with ui.row().classes("w-full items-center gap-2 mb-1"):
                 ui.icon("check_circle" if dep.available else "error").classes(color)
                 ui.label(f"{dep.name}: {dep.hint}").classes(f"text-sm {color}")
 
         ui.separator().classes("my-3")
+        ui.label("本地模型").classes("text-sm font-medium mb-1")
 
         for model in status.models:
             if model.loaded:
                 badge_color, badge_text = "green", "已就绪"
-            elif model.downloading:
-                badge_color, badge_text = "blue", "下载中"
             elif model.ready:
-                badge_color, badge_text = "grey", "未下载"
+                badge_color, badge_text = "grey", "未加载"
             else:
-                badge_color, badge_text = "orange", "不可用"
+                badge_color, badge_text = "orange", "未找到"
 
             with ui.card().classes("w-full mb-2"):
                 with ui.row().classes("w-full items-start justify-between gap-2"):
@@ -51,33 +49,17 @@ def register_settings_page(container: AppContainer) -> None:
                         ui.label(model.hint).classes("text-xs text-gray-500 mt-1")
                     ui.badge(badge_text, color=badge_color)
 
-                if model.downloading or model.progress_percent > 0:
-                    progress_value = max(0.0, min(1.0, model.progress_percent / 100.0))
-                    ui.linear_progress(value=progress_value).classes("w-full mt-2")
-                    ui.label(
-                        model.progress_message or f"进度: {model.progress_percent:.0f}%"
-                    ).classes("text-xs text-blue-600 mt-1")
-                    if model.recent_logs:
-                        with ui.column().classes("gap-0 mt-1"):
-                            for line in model.recent_logs[-4:]:
-                                ui.label(f"· {line}").classes("text-xs text-gray-500")
+                if not model.ready:
+                    ui.markdown(
+                        f"""
+**下载说明：** 在项目根目录运行：
 
-                if model.ready and not model.loaded:
-                    if model.downloading:
-                        with ui.row().classes("items-center gap-2 mt-2"):
-                            ui.spinner(size="sm")
-                            ui.label("下载中，请保持页面打开…").classes("text-sm text-blue-600")
-                    else:
-                        ui.button(
-                            "下载模型",
-                            on_click=lambda k=model.key: _start_download(container, k, models_panel),
-                        ).props("outline color=primary").classes("mt-2")
-
-        if not status.all_ready:
-            ui.button(
-                "下载全部可用模型",
-                on_click=lambda: _start_download_all(container, models_panel),
-            ).props("color=primary").classes("mt-2")
+```bash
+chmod +x {_DOWNLOAD_SCRIPT}
+{_DOWNLOAD_SCRIPT}
+```
+                        """
+                    ).classes("text-xs mt-2")
 
     @ui.page("/settings")
     async def settings_page() -> None:
@@ -85,57 +67,27 @@ def register_settings_page(container: AppContainer) -> None:
 
         with ui.header().classes("items-center"):
             ui.button(icon="arrow_back", on_click=lambda: ui.navigate.to("/")).props("flat color=white")
-            ui.label("模型设置").classes("text-xl font-bold")
+            ui.label("系统设置").classes("text-xl font-bold")
 
         with ui.column().classes("w-full max-w-3xl mx-auto p-4 gap-4"):
             with ui.card().classes("w-full"):
-                ui.label("本地 AI 模型").classes("text-lg font-semibold")
+                ui.label("AI 栈状态").classes("text-lg font-semibold")
                 ui.label(
-                    "请在此预先下载模型。会议处理不会自动下载模型，未下载时上传后将处理失败。"
+                    "MemoFlow 使用 VibeVoice 本地 ASR + DeepSeek / OpenAI / Qwen3 远程 API。"
+                    " 请确保模型权重与 API 密钥均已就绪后再处理会议。"
                 ).classes("text-sm text-gray-500 mb-3")
-                models_panel()
+                status_panel()
 
             with ui.card().classes("w-full"):
                 ui.label("配置说明").classes("text-lg font-semibold")
                 ui.markdown(
-                    """
+                    f"""
 - **ffmpeg**: 终端运行 `brew install ffmpeg`（处理 m4a/mp3 必需）
-- **说话人识别**: 在 `.env` 中设置 `MEMOFLOW_HF_TOKEN`（只读 Token 即可），并在 HuggingFace 接受 pyannote 模型协议
-- **摘要 LLM**: 需要 Apple Silicon Mac（MLX）
-- 模型下载可能耗时数分钟，下载期间请保持本页面打开；若连接中断可刷新后重试
+- **VibeVoice ASR**: 运行 `{_DOWNLOAD_SCRIPT}` 下载本地权重到 `./models/VibeVoice-ASR`
+- **DeepSeek LLM**: 在 `.env` 中设置 `MEMOFLOW_DEEPSEEK_API_KEY`
+- **OpenAI Embedding**: 在 `.env` 中设置 `MEMOFLOW_OPENAI_API_KEY`
+- **Qwen3 Reranker**: 在 `.env` 中设置 `MEMOFLOW_RERANK_API_KEY`（DashScope 兼容 API）
                     """
                 )
 
-        ui.timer(_POLL_INTERVAL_SECONDS, models_panel.refresh)
-
-
-def _start_download(container: AppContainer, key: ModelKey, panel) -> None:  # noqa: ANN001
-    ui.notify(f"开始下载 {key.value} 模型，请稍候…", type="info")
-
-    async def _run() -> None:
-        try:
-            await container.system_service.download_model(key)
-            ui.notify(f"{key.value} 模型下载完成", type="positive")
-        except Exception as exc:  # noqa: BLE001
-            ui.notify(f"下载失败: {exc}", type="negative")
-        finally:
-            panel.refresh()
-
-    asyncio.create_task(_run())
-    panel.refresh()
-
-
-def _start_download_all(container: AppContainer, panel) -> None:  # noqa: ANN001
-    ui.notify("开始下载全部可用模型，请稍候…", type="info")
-
-    async def _run() -> None:
-        try:
-            await container.system_service.download_all()
-            ui.notify("全部可用模型已下载完成", type="positive")
-        except Exception as exc:  # noqa: BLE001
-            ui.notify(f"下载失败: {exc}", type="negative")
-        finally:
-            panel.refresh()
-
-    asyncio.create_task(_run())
-    panel.refresh()
+        ui.timer(_POLL_INTERVAL_SECONDS, status_panel.refresh)

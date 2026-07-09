@@ -5,6 +5,7 @@ from loguru import logger
 
 from memoflow.application.dto import KnowledgeHitDTO
 from memoflow.application.ports.embedding_port import EmbeddingPort
+from memoflow.application.ports.rerank_port import RerankPort
 from memoflow.application.ports.unit_of_work import UnitOfWorkFactory
 from memoflow.domain.knowledge.entities import KnowledgeChunk
 from memoflow.domain.knowledge.repository import VectorRepository
@@ -24,11 +25,17 @@ class KnowledgeApplicationService:
         embedding: EmbeddingPort,
         vector_repository: VectorRepository,
         chunk_max_chars: int = _DEFAULT_CHUNK_MAX_CHARS,
+        reranker: RerankPort | None = None,
+        rerank_top_n: int = 5,
+        retrieve_k: int | None = None,
     ) -> None:
         self._uow_factory = uow_factory
         self._embedding = embedding
         self._vector_repository = vector_repository
         self._chunk_max_chars = chunk_max_chars
+        self._reranker = reranker
+        self._rerank_top_n = rerank_top_n
+        self._retrieve_k = retrieve_k
 
     async def index_meeting(self, meeting_id: str) -> int:
         """将会议转写切分、向量化并写入知识库，返回索引的片段数量。"""
@@ -61,25 +68,52 @@ class KnowledgeApplicationService:
         logger.info(f"[{meeting_id}] 知识库索引完成，共 {len(chunks)} 个片段")
         return len(chunks)
 
+    def _candidate_k(self, top_k: int) -> int:
+        if self._reranker is None:
+            return top_k
+        if self._retrieve_k is not None:
+            return max(self._retrieve_k, top_k)
+        return max(top_k * 4, self._rerank_top_n, top_k)
+
     async def search(
         self, query: str, meeting_id: str | None = None, top_k: int = 5
     ) -> list[KnowledgeHitDTO]:
         """基于语义相似度检索相关的历史会议片段（RAG 检索入口）。"""
         query_vector = (await self._embedding.embed([query]))[0]
+        candidate_k = self._candidate_k(top_k)
         hits = await self._vector_repository.search(
             query_embedding=Embedding.from_list(query_vector),
-            top_k=top_k,
+            top_k=candidate_k,
             meeting_id=meeting_id,
+        )
+        if not hits:
+            return []
+
+        if self._reranker is None:
+            return [
+                KnowledgeHitDTO(
+                    chunk_id=h.chunk_id,
+                    meeting_id=h.meeting_id,
+                    text=h.text,
+                    score=h.score,
+                    source_utterance_ids=h.source_utterance_ids,
+                )
+                for h in hits[:top_k]
+            ]
+
+        ranked = await self._reranker.rerank(
+            query, [h.text for h in hits], top_n=top_k
         )
         return [
             KnowledgeHitDTO(
-                chunk_id=h.chunk_id,
-                meeting_id=h.meeting_id,
-                text=h.text,
-                score=h.score,
-                source_utterance_ids=h.source_utterance_ids,
+                chunk_id=hits[idx].chunk_id,
+                meeting_id=hits[idx].meeting_id,
+                text=hits[idx].text,
+                score=score,
+                source_utterance_ids=hits[idx].source_utterance_ids,
             )
-            for h in hits
+            for idx, score in ranked
+            if 0 <= idx < len(hits)
         ]
 
     def _chunk_transcript(self, transcript: Transcript) -> list[tuple[str, list[str]]]:

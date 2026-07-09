@@ -1,7 +1,7 @@
 """说话人识别（Speaker Diarization）端口。
 
-生产实现：`memoflow.infrastructure.ai.pyannote_diarization.PyannoteDiarization`
-（基于 pyannote.audio 的 speaker-diarization-3.1 pipeline）。
+使用 VibeVoice ASR 时，说话人标签由 ASR 内置 diarization 提供，本端口可选。
+亦可替换为 pyannote.audio 等独立说话人分离实现。
 """
 from __future__ import annotations
 

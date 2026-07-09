@@ -5,7 +5,7 @@
 按时间重叠度对齐，组装成带说话人标注的 `Transcript` 聚合。
 
 这是纯粹的领域逻辑（无 I/O），输入输出均为领域内定义的简单数据结构，
-应用层负责把 AI 适配器（SenseVoice / pyannote）的原始输出转换为这里的
+应用层负责把 AI 适配器（如 VibeVoice）的原始输出转换为这里的
 `RawUtteranceSegment` / `RawSpeakerSegment` 后再调用。
 """
 from __future__ import annotations

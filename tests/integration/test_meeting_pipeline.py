@@ -12,9 +12,9 @@ from memoflow.application.knowledge_service import KnowledgeApplicationService
 from memoflow.application.meeting_service import MeetingApplicationService
 from memoflow.application.pipeline.processing_pipeline import MeetingProcessingPipeline
 from memoflow.application.ports.asr_port import ASRPort, ASRResult, ASRSegment
-from memoflow.application.ports.diarization_port import DiarizationPort, SpeakerSegment
 from memoflow.application.ports.embedding_port import EmbeddingPort
 from memoflow.application.ports.llm_port import LLMPort
+from memoflow.application.ports.rerank_port import RerankPort
 from memoflow.application.pipeline.runner import AsyncioPipelineRunner
 from memoflow.application.summary_service import SummaryApplicationService
 from memoflow.application.transcription_service import TranscriptionApplicationService
@@ -35,18 +35,14 @@ class FakeASR(ASRPort):
         return ASRResult(
             language="zh",
             segments=[
-                ASRSegment(start=0.0, end=2.0, text="大家好，我们开始今天的周会"),
-                ASRSegment(start=2.5, end=5.0, text="这周进度基本符合预期"),
+                ASRSegment(
+                    start=0.0, end=2.0, text="大家好，我们开始今天的周会", speaker_label="SPEAKER_00"
+                ),
+                ASRSegment(
+                    start=2.5, end=5.0, text="这周进度基本符合预期", speaker_label="SPEAKER_01"
+                ),
             ],
         )
-
-
-class FakeDiarization(DiarizationPort):
-    async def diarize(self, audio_path: str) -> list[SpeakerSegment]:
-        return [
-            SpeakerSegment(start=0.0, end=2.2, speaker_label="SPEAKER_00"),
-            SpeakerSegment(start=2.2, end=6.0, speaker_label="SPEAKER_01"),
-        ]
 
 
 class FakeLLM(LLMPort):
@@ -69,6 +65,12 @@ class FakeEmbedding(EmbeddingPort):
     @property
     def dimension(self) -> int:
         return 3
+
+
+class FakeReranker(RerankPort):
+    async def rerank(self, query: str, documents: list[str], top_n: int) -> list[tuple[int, float]]:
+        del query
+        return [(i, float(len(documents) - i)) for i in range(min(top_n, len(documents)))]
 
 
 class _BypassModelService(ModelService):
@@ -94,17 +96,15 @@ async def pipeline_context(tmp_path):
     file_storage = LocalFileStorage(tmp_path / "audio")
     vector_repository = LanceDBVectorRepository(str(tmp_path / "lancedb"))
 
-    transcription_service = TranscriptionApplicationService(
-        uow_factory, file_storage, FakeASR(), FakeDiarization()
-    )
+    transcription_service = TranscriptionApplicationService(uow_factory, file_storage, FakeASR())
     summary_service = SummaryApplicationService(uow_factory, FakeLLM(), llm_model_name="fake-llm")
-    knowledge_service = KnowledgeApplicationService(uow_factory, FakeEmbedding(), vector_repository)
+    knowledge_service = KnowledgeApplicationService(
+        uow_factory, FakeEmbedding(), vector_repository, reranker=FakeReranker()
+    )
 
     from memoflow.config import get_settings
 
-    model_service = _BypassModelService(
-        get_settings(), FakeASR(), FakeDiarization(), FakeLLM(), FakeEmbedding()
-    )
+    model_service = _BypassModelService(get_settings(), FakeASR())
 
     pipeline = MeetingProcessingPipeline(
         uow_factory, transcription_service, summary_service, knowledge_service, model_service
@@ -147,7 +147,13 @@ async def test_full_pipeline_completes_meeting(pipeline_context):
     assert len(summary.action_items) == 1
     assert summary.action_items[0].owner == "张三"
 
-    hits = await knowledge_service.search(query="进度", meeting_id=meeting.id, top_k=3)
+    # 摘要完成后状态先变为 COMPLETED，知识库索引仍在后台继续；轮询等待索引完成
+    hits: list = []
+    for _ in range(50):
+        hits = await knowledge_service.search(query="进度", meeting_id=meeting.id, top_k=3)
+        if hits:
+            break
+        await asyncio.sleep(0.05)
     assert len(hits) >= 1
 
 
@@ -180,7 +186,7 @@ async def test_retry_resumes_from_diarization_without_rerunning_asr(pipeline_con
         assert m is not None
         m.status = MeetingStatus.DIARIZING
         m.summary_id = None
-        m.fail(stage="diarization", reason="simulated pyannote failure")
+        m.fail(stage="diarization", reason="simulated diarization failure")
         await uow.meetings.save(m)
         await uow.commit()
 

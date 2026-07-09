@@ -10,7 +10,7 @@ from memoflow.domain.transcript.value_objects import SpeakerId, TranscriptId, Ut
 
 
 class Speaker(Entity[SpeakerId]):
-    """说话人：pyannote 输出的是匿名标签（如 SPEAKER_00），用户可在 UI 中重命名为真实姓名。"""
+    """说话人：ASR 输出的是匿名标签（如 SPEAKER_00），用户可在 UI 中重命名为真实姓名。"""
 
     def __init__(self, speaker_id: SpeakerId, label: str, display_name: str | None = None) -> None:
         super().__init__(speaker_id)

@@ -91,10 +91,14 @@ def _friendly_error(stage: str, reason: str) -> str:
     lower = reason.lower()
     if "ffmpeg" in lower:
         return "缺少 ffmpeg，无法解码 m4a/mp3 等音频。请运行 brew install ffmpeg 后点击「重试处理」。"
-    if "hf_token" in lower or "gated" in lower or "401" in reason or "use_auth_token" in lower:
-        return "pyannote 模型需要 HuggingFace Token。请在 .env 设置 MEMOFLOW_HF_TOKEN 并接受模型协议后重试。"
-    if "mlx" in lower or "metal" in lower:
-        return "摘要模型需要 Apple Silicon Mac 上的 MLX 环境。请确认在 M 系列 Mac 上运行。"
+    if "vibevoice" in lower or "download_vibevoice_asr" in lower:
+        return "VibeVoice ASR 模型未找到。请运行 ./scripts/download_vibevoice_asr.sh 下载本地权重后重试。"
+    if "deepseek" in lower or ("api" in lower and "key" in lower and stage == "summarization"):
+        return "DeepSeek API 调用失败。请在 .env 设置 MEMOFLOW_DEEPSEEK_API_KEY 并检查网络后重试。"
+    if "openai" in lower or "embedding" in lower:
+        return "OpenAI Embedding API 调用失败。请在 .env 设置 MEMOFLOW_OPENAI_API_KEY 后重试。"
+    if "rerank" in lower or "dashscope" in lower:
+        return "Rerank API 调用失败。请在 .env 设置 MEMOFLOW_RERANK_API_KEY 后重试。"
     if "不能执行操作" in reason and "transcribing" in lower:
         return "处理状态异常，请点击「重试处理」从上次成功的阶段继续。"
     stage_labels = {

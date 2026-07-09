@@ -1,6 +1,7 @@
 """ASR（自动语音识别）端口。
 
-生产实现：`memoflow.infrastructure.ai.sensevoice_asr.SenseVoiceASR`（基于 FunASR + SenseVoice-Small）。
+生产实现：`memoflow.infrastructure.ai.vibevoice_asr.VibeVoiceASR`（基于 Microsoft VibeVoice-ASR，
+单次推理同时输出转写文本、说话人标签与时间戳）。
 可替换为 Whisper / Paraformer 等任意实现，只需实现本接口。
 """
 from __future__ import annotations
@@ -15,6 +16,7 @@ class ASRSegment:
     end: float
     text: str
     confidence: float | None = None
+    speaker_label: str | None = None
 
 
 @dataclass(frozen=True)
