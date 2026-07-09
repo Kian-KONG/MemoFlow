@@ -1,15 +1,17 @@
-"""应用入口：装配 FastAPI + NiceGUI，注册路由、异常处理与生命周期钩子。"""
+"""应用入口：装配 FastAPI，注册路由、CORS、静态前端与生命周期钩子。"""
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from loguru import logger
-from nicegui import ui
 
 from memoflow.config import get_settings
-from memoflow.container import AppContainer, build_container
+from memoflow.container import build_container
 from memoflow.domain.shared.exceptions import (
     DomainError,
     EntityNotFoundError,
@@ -18,7 +20,8 @@ from memoflow.domain.shared.exceptions import (
 )
 from memoflow.infrastructure.persistence.db import init_models
 from memoflow.interfaces.api.router import api_router
-from memoflow.interfaces.ui.app import register_ui
+
+_FRONTEND_DIST = Path(__file__).resolve().parents[2] / "frontend" / "dist"
 
 
 @asynccontextmanager
@@ -41,6 +44,17 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+        ],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
     app.include_router(api_router)
 
     @app.exception_handler(EntityNotFoundError)
@@ -60,27 +74,39 @@ def create_app() -> FastAPI:
     async def health() -> dict[str, str]:
         return {"status": "ok"}
 
+    _mount_frontend(app)
+
     return app
 
 
+def _mount_frontend(app: FastAPI) -> None:
+    """生产模式：若 frontend/dist 存在，托管静态资源并以 SPA fallback 回 index.html。"""
+    if not _FRONTEND_DIST.is_dir():
+        logger.warning(
+            f"未找到前端构建产物 {_FRONTEND_DIST}；"
+            "开发时请单独运行 frontend (npm run dev)，生产请先 npm run build。"
+        )
+        return
+
+    assets_dir = _FRONTEND_DIST / "assets"
+    if assets_dir.is_dir():
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="frontend-assets")
+
+    index_html = _FRONTEND_DIST / "index.html"
+
+    @app.get("/{full_path:path}")
+    async def spa_fallback(full_path: str) -> FileResponse:
+        # FastAPI 已先匹配 /api、/health、/docs 等；此处仅作兜底
+        if full_path.startswith(("api/", "health", "docs", "openapi.json", "redoc")):
+            return JSONResponse(status_code=404, content={"detail": "Not Found"})
+
+        candidate = (_FRONTEND_DIST / full_path).resolve()
+        if full_path and candidate.is_file() and _FRONTEND_DIST in candidate.parents:
+            return FileResponse(candidate)
+        return FileResponse(index_html)
+
+
 app = create_app()
-
-
-def _register_ui_once() -> None:
-    """NiceGUI 页面需要在 `ui.run_with` 之前注册，但页面内部会通过 `app.state.container` 懒获取依赖。"""
-
-    class _LazyContainer:
-        def __getattr__(self, name: str):  # noqa: ANN001, ANN204
-            container = getattr(app.state, "container", None)
-            if container is None:
-                raise RuntimeError("应用正在启动，请稍后刷新页面")
-            return getattr(container, name)
-
-    register_ui(_LazyContainer())  # type: ignore[arg-type]
-
-
-_register_ui_once()
-ui.run_with(app, title="MemoFlow", storage_secret=get_settings().secret_key)
 
 
 if __name__ == "__main__":

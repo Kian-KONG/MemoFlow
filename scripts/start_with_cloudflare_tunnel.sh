@@ -6,6 +6,7 @@
 # 依赖:
 #   brew install cloudflared
 #   pip install -e ".[dev]"
+#   cd frontend && npm install && npm run build
 #
 # 另一台设备用终端输出的 https://xxxx.trycloudflare.com 访问。
 # Ctrl+C 停止隧道和应用。
@@ -17,11 +18,17 @@ cd "$ROOT"
 
 HOST="${MEMOFLOW_HOST:-127.0.0.1}"
 PORT="${MEMOFLOW_PORT:-8000}"
+LOG_FILE="${ROOT}/data/uvicorn.log"
+
+if [[ ! -d frontend/dist ]]; then
+  echo "Error: 未找到 frontend/dist。请先构建前端:" >&2
+  echo "  cd frontend && npm install && npm run build" >&2
+  exit 1
+fi
 
 if [[ -f .env ]]; then
   # shellcheck disable=SC1091
   set -a
-  # 只读取端口，避免 source 整份 .env 带入注释等问题
   port_line=$(grep -E '^MEMOFLOW_PORT=' .env | tail -1 || true)
   if [[ -n "$port_line" ]]; then
     PORT="${port_line#MEMOFLOW_PORT=}"
@@ -49,6 +56,8 @@ if ! command -v uvicorn >/dev/null 2>&1; then
   exit 1
 fi
 
+mkdir -p "${ROOT}/data"
+
 UVICORN_PID=""
 cleanup() {
   if [[ -n "$UVICORN_PID" ]] && kill -0 "$UVICORN_PID" 2>/dev/null; then
@@ -61,29 +70,43 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 echo "启动 MemoFlow: $APP_URL"
-uvicorn memoflow.main:app --host "$HOST" --port "$PORT" &
+echo "日志: $LOG_FILE"
+PYTHONPATH="${ROOT}/src" uvicorn memoflow.main:app --host "$HOST" --port "$PORT" >>"$LOG_FILE" 2>&1 &
 UVICORN_PID=$!
 
 echo -n "等待服务就绪"
-for _ in $(seq 1 60); do
-  if curl -fsS "$APP_URL/health" >/dev/null 2>&1; then
+ready=0
+for _ in $(seq 1 90); do
+  if curl -fsS "$APP_URL/health" >/dev/null 2>&1 && curl -fsS "$APP_URL/api/meetings" >/dev/null 2>&1; then
     echo " OK"
+    ready=1
     break
+  fi
+  if ! kill -0 "$UVICORN_PID" 2>/dev/null; then
+    echo " FAIL (进程已退出)"
+    echo "--- uvicorn 日志 (最后 40 行) ---" >&2
+    tail -40 "$LOG_FILE" >&2 || true
+    exit 1
   fi
   echo -n "."
   sleep 1
 done
 
-if ! curl -fsS "$APP_URL/health" >/dev/null 2>&1; then
+if [[ "$ready" -ne 1 ]]; then
   echo "" >&2
-  echo "Error: MemoFlow 未在 $APP_URL 就绪，请检查日志。" >&2
+  echo "Error: MemoFlow 未在 $APP_URL 就绪。" >&2
+  echo "请检查日志: $LOG_FILE" >&2
+  tail -40 "$LOG_FILE" >&2 || true
   exit 1
 fi
 
 echo ""
 echo "本地访问: $APP_URL"
+echo "本地测试: ./scripts/smoke_test.sh $APP_URL"
 echo "正在创建 Cloudflare Quick Tunnel（下方会输出公网 URL）..."
 echo "提示: 链接是临时的，任何拿到 URL 的人都能访问。Ctrl+C 关闭。"
+echo "若外网 502，请确认本脚本终端未关闭，并查看 $LOG_FILE"
+echo "大文件上传易 524 超时：请在本机 $APP_URL 上传，或压缩音频后再经隧道传"
 echo ""
 
 cloudflared tunnel --url "$APP_URL"

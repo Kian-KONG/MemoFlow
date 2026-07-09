@@ -1,16 +1,15 @@
 [project]
 name = "memoflow"
 version = "0.1.0"
-description = "AI 会议助手 —— VibeVoice 本地转写 + DeepSeek/OpenAI/Qwen3 API 摘要与检索"
+description = "AI 会议助手 —— VibeVoice 本地转写 + DeepSeek/OpenAI/Qwen3 API 摘要与检索（FastAPI + React）"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
 
 dependencies = [
-    # --- Web / UI ---
+    # --- Web ---
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.30.0",
-    "nicegui>=1.4.0",
     "python-multipart>=0.0.9",
     "pydantic>=2.7.0",
     "pydantic-settings>=2.3.0",

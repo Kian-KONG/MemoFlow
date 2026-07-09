@@ -19,3 +19,7 @@ lancedb/
 # models cache
 models/
 *.gguf
+
+# frontend
+frontend/node_modules/
+frontend/dist/

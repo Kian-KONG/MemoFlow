@@ -1,0 +1,87 @@
+.processing {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 1.25rem;
+}
+
+.processing-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.processing-header h1 {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+
+.filename {
+  font-size: 0.75rem;
+  color: #9ca3af;
+}
+
+.stage-label {
+  margin: 0.85rem 0 0.5rem;
+  font-weight: 500;
+}
+
+.stage-label.active {
+  color: #2563eb;
+}
+
+.stage-label.completed {
+  color: #059669;
+}
+
+.stage-label.failed {
+  color: #dc2626;
+}
+
+.stage-bar {
+  height: 0.5rem;
+  background: #e5e7eb;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.stage-fill {
+  height: 100%;
+  background: #2563eb;
+  transition: width 0.3s ease;
+}
+
+.hint {
+  margin: 0.4rem 0 0;
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+.hint.ok {
+  color: #059669;
+}
+
+.failed-block .error-msg {
+  margin: 0.35rem 0;
+  font-size: 0.9rem;
+  color: #dc2626;
+}
+
+.failed-block button {
+  margin-top: 0.75rem;
+  background: #fff;
+  border: 1px solid #dc2626;
+  color: #dc2626;
+  border-radius: 6px;
+  padding: 0.45rem 0.9rem;
+  font: inherit;
+  cursor: pointer;
+}
+
+.failed-block button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
