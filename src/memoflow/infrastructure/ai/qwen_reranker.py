@@ -20,16 +20,17 @@ class QwenReranker(RerankPort):
         base_url: str = _DEFAULT_BASE_URL,
         model: str = _DEFAULT_MODEL,
         endpoint_path: str | None = None,
+        endpoint_url: str | None = None,
         timeout: float = 60.0,
     ) -> None:
         self._api_key = api_key.strip()
         self._base_url = base_url.rstrip("/")
         self._model = model
         self._endpoint_path = endpoint_path
+        self._endpoint_url = endpoint_url.strip() if endpoint_url else None
         self._timeout = timeout
         logger.debug(
-            f"QwenReranker initialized: model={model}, base_url={self._base_url}, "
-            f"endpoint={self._resolve_endpoint_path()}"
+            f"QwenReranker initialized: model={model}, endpoint={self._request_url()}"
         )
 
     def _resolve_endpoint_path(self) -> str:
@@ -40,6 +41,8 @@ class QwenReranker(RerankPort):
         return "/reranks"
 
     def _request_url(self) -> str:
+        if self._endpoint_url:
+            return self._endpoint_url
         return f"{self._base_url}{self._resolve_endpoint_path()}"
 
     async def rerank(self, query: str, documents: list[str], top_n: int) -> list[tuple[int, float]]:

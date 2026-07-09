@@ -75,28 +75,31 @@ def build_container(settings: Settings) -> AppContainer:
     file_storage: FileStoragePort = LocalFileStorage(settings.audio_dir)
     asr: ASRPort = VibeVoiceASR(model_path=settings.asr_model_path, device=settings.asr_device)
     llm: LLMPort = DeepSeekLLM(
-        api_key=settings.deepseek_api_key,
-        base_url=settings.deepseek_base_url,
-        model=settings.deepseek_model,
+        api_key=settings.resolved_llm_api_key,
+        base_url=settings.resolved_llm_base_url,
+        model=settings.resolved_llm_model,
         default_max_tokens=settings.llm_max_tokens,
         default_temperature=settings.llm_temperature,
     )
     embedding: EmbeddingPort = OpenAIEmbedding(
-        api_key=settings.openai_api_key,
-        base_url=settings.openai_base_url,
-        model=settings.embedding_model,
+        api_key=settings.resolved_embedding_api_key,
+        base_url=settings.resolved_embedding_base_url,
+        model=settings.resolved_embedding_model,
         dimensions=settings.embedding_dimensions,
     )
     reranker = QwenReranker(
-        api_key=settings.rerank_api_key,
+        api_key=settings.resolved_rerank_api_key,
         base_url=settings.rerank_base_url,
-        model=settings.rerank_model,
+        model=settings.resolved_rerank_model,
+        endpoint_url=settings.reranker_api_url.strip() or None,
     )
     vector_repository: VectorRepository = LanceDBVectorRepository(str(settings.lancedb_dir))
 
     # ---- 应用服务 ----
     transcription_service = TranscriptionApplicationService(uow_factory, file_storage, asr)
-    summary_service = SummaryApplicationService(uow_factory, llm, llm_model_name=settings.deepseek_model)
+    summary_service = SummaryApplicationService(
+        uow_factory, llm, llm_model_name=settings.resolved_llm_model
+    )
     knowledge_service = KnowledgeApplicationService(
         uow_factory,
         embedding,

@@ -98,6 +98,16 @@ uvicorn memoflow.main:app --reload --host 127.0.0.1 --port 8000
 打开浏览器访问 `http://127.0.0.1:8000/` 使用 NiceGUI 界面上传录音；
 或访问 `http://127.0.0.1:8000/docs` 查看 FastAPI 自动生成的 API 文档。
 
+### 临时给其他设备访问（Cloudflare Quick Tunnel）
+
+```bash
+brew install cloudflared
+chmod +x ./scripts/start_with_cloudflare_tunnel.sh
+./scripts/start_with_cloudflare_tunnel.sh
+```
+
+终端会输出 `https://xxxx.trycloudflare.com`，在另一台电脑的浏览器打开即可。计算和模型仍在本机运行；关闭脚本后外网链接失效。
+
 ### 首次使用需要准备
 
 - **VibeVoice ASR**（本地权重）：

@@ -99,11 +99,28 @@ class ModelService:
 
     def _check_dependencies(self) -> list[DependencyStatus]:
         ffmpeg_ok = shutil.which("ffmpeg") is not None
-        api_keys = [
-            ("DeepSeek API", self._settings.deepseek_api_key, "在 .env 设置 MEMOFLOW_DEEPSEEK_API_KEY"),
-            ("OpenAI API", self._settings.openai_api_key, "在 .env 设置 MEMOFLOW_OPENAI_API_KEY"),
-            ("Rerank API", self._settings.rerank_api_key, "在 .env 设置 MEMOFLOW_RERANK_API_KEY"),
-        ]
+        if self._settings.bosch_aigc_api_key.strip():
+            api_keys = [
+                (
+                    "Bosch AIGC API",
+                    self._settings.bosch_aigc_api_key,
+                    "在 .env 设置 BOSCH_AIGC_API_KEY",
+                ),
+            ]
+        else:
+            api_keys = [
+                ("LLM API", self._settings.resolved_llm_api_key, "设置 MEMOFLOW_DEEPSEEK_API_KEY 或 BOSCH_AIGC_API_KEY"),
+                (
+                    "Embedding API",
+                    self._settings.resolved_embedding_api_key,
+                    "设置 MEMOFLOW_OPENAI_API_KEY 或 BOSCH_AIGC_API_KEY",
+                ),
+                (
+                    "Rerank API",
+                    self._settings.resolved_rerank_api_key,
+                    "设置 MEMOFLOW_RERANK_API_KEY 或 BOSCH_AIGC_API_KEY",
+                ),
+            ]
         return [
             DependencyStatus(
                 name="ffmpeg",

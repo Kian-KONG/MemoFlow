@@ -15,6 +15,7 @@ _DEFAULT_MODEL = "text-embedding-3-small"
 _MODEL_DIMENSIONS: dict[str, int] = {
     "text-embedding-3-small": 1536,
     "text-embedding-3-large": 3072,
+    "text-embedding-v3": 1024,
 }
 
 
