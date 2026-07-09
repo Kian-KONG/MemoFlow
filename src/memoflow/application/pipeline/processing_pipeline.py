@@ -89,8 +89,8 @@ class MeetingProcessingPipeline:
 def _friendly_error(stage: str, reason: str) -> str:
     """将底层异常转为用户可理解的错误说明。"""
     lower = reason.lower()
-    if "ffmpeg" in lower:
-        return "缺少 ffmpeg，无法解码 m4a/mp3 等音频。请运行 brew install ffmpeg 后点击「重试处理」。"
+    if "ffmpeg" in lower or "m4a" in lower or "torchcodec" in lower or "librosa cannot decode" in lower:
+        return "缺少 ffmpeg 或音频解码失败。请运行 brew install ffmpeg 后点击「重试处理」。"
     if "vibevoice" in lower or "download_vibevoice_asr" in lower:
         return "VibeVoice ASR 模型未找到。请运行 ./scripts/download_vibevoice_asr.sh 下载本地权重后重试。"
     if "deepseek" in lower or ("api" in lower and "key" in lower and stage == "summarization"):

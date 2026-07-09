@@ -75,6 +75,12 @@
 
 .status.err {
   color: #dc2626;
+  white-space: pre-wrap;
+  font-family: inherit;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  padding: 0.65rem;
 }
 
 .upload-form button[type='submit'] {

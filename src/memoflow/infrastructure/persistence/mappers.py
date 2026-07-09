@@ -1,6 +1,8 @@
 """领域实体 <-> ORM 模型 映射函数。"""
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from memoflow.domain.meeting.entities import Meeting
 from memoflow.domain.meeting.value_objects import AudioFile, MeetingId, MeetingStatus
 from memoflow.domain.summary.entities import ActionItem, Decision, Summary
@@ -17,6 +19,14 @@ from memoflow.infrastructure.persistence.models import (
     TranscriptModel,
     UtteranceModel,
 )
+
+
+def _as_utc(dt: datetime) -> datetime:
+    """SQLite 读回的 naive datetime 视为 UTC。"""
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
 
 # ---------------------------------------------------------------------------
 # Meeting
@@ -36,8 +46,8 @@ def meeting_to_domain(model: MeetingModel) -> Meeting:
         title=model.title,
         audio=audio,
         status=MeetingStatus(model.status),
-        created_at=model.created_at,
-        updated_at=model.updated_at,
+        created_at=_as_utc(model.created_at),
+        updated_at=_as_utc(model.updated_at),
         transcript_id=model.transcript_id,
         summary_id=model.summary_id,
         error_message=model.error_message,

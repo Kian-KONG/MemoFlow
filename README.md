@@ -103,6 +103,28 @@ cd frontend && npm run dev
 
 访问 `http://127.0.0.1:5173/`。
 
+### 本地冒烟测试
+
+不经过 Cloudflare，先确认后端与 API 正常：
+
+```bash
+# 终端 1：启动后端（需已 npm run build）
+PYTHONPATH=src uvicorn memoflow.main:app --host 127.0.0.1 --port 8000
+
+# 终端 2：运行检查
+chmod +x ./scripts/smoke_test.sh
+./scripts/smoke_test.sh
+# 或指定地址: ./scripts/smoke_test.sh http://127.0.0.1:8000
+```
+
+通过 Cloudflare 隧道后，用公网 URL 再测一遍：
+
+```bash
+./scripts/smoke_test.sh https://xxxx.trycloudflare.com
+```
+
+若 `smoke_test` 失败，页面上的错误提示会说明是 502 / 网络断开还是 API 异常。
+
 ### 临时给其他设备访问（Cloudflare Quick Tunnel）
 
 先构建前端，再启动隧道（脚本会检查 `frontend/dist`）：

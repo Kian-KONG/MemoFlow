@@ -1,6 +1,8 @@
 """转写应用服务：编排 VibeVoice ASR + 转写组装。"""
 from __future__ import annotations
 
+import asyncio
+
 from loguru import logger
 
 from memoflow.application.dto import TranscriptDTO
@@ -16,6 +18,7 @@ from memoflow.domain.transcript.services import (
     TranscriptAssemblyService,
 )
 from memoflow.domain.transcript.value_objects import TranscriptId
+from memoflow.infrastructure.audio.ffmpeg import prepare_audio_for_asr
 
 
 class TranscriptionApplicationService:
@@ -57,7 +60,12 @@ class TranscriptionApplicationService:
             await uow.commit()
 
         logger.info(f"[{meeting_id}] 开始语音识别（VibeVoice）...")
-        asr_result = await self._asr.transcribe(audio_path)
+        asr_input, cleanup = await asyncio.to_thread(prepare_audio_for_asr, audio_path)
+        try:
+            asr_result = await self._asr.transcribe(str(asr_input))
+        finally:
+            if cleanup is not None:
+                cleanup()
 
         asr_segments = [
             RawUtteranceSegment(start=s.start, end=s.end, text=s.text, confidence=s.confidence)

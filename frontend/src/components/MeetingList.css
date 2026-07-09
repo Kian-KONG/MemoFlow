@@ -45,7 +45,15 @@
 }
 
 .list-error {
+  margin: 0;
   color: #dc2626;
+  font-size: 0.85rem;
+  white-space: pre-wrap;
+  font-family: inherit;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  padding: 0.75rem;
 }
 
 .meeting-list ul {

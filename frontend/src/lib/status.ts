@@ -34,14 +34,3 @@ export const STAGE_HINTS: Record<string, string> = {
 export function isTerminalStatus(status: string): boolean {
   return status === 'completed' || status === 'failed'
 }
-
-export function formatElapsed(updatedAt: string): string {
-  const started = new Date(updatedAt)
-  const seconds = Math.max(0, Math.floor((Date.now() - started.getTime()) / 1000))
-  if (seconds < 60) return `${seconds} 秒`
-  const minutes = Math.floor(seconds / 60)
-  const secs = seconds % 60
-  if (minutes < 60) return `${minutes} 分 ${secs} 秒`
-  const hours = Math.floor(minutes / 60)
-  return `${hours} 小时 ${minutes % 60} 分`
-}

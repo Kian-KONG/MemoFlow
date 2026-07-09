@@ -1,6 +1,7 @@
 import { useRef, useState, type FormEvent } from 'react'
 import { uploadMeeting } from '../api/meetings'
 import type { Meeting } from '../api/types'
+import { formatApiError } from '../lib/apiError'
 import './UploadForm.css'
 
 const ACCEPT = '.mp3,.wav,.m4a,.flac,.ogg,audio/*'
@@ -38,7 +39,7 @@ export function UploadForm({ onUploaded }: UploadFormProps) {
       if (inputRef.current) inputRef.current.value = ''
       onUploaded(meeting)
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+      setError(formatApiError(err, '上传失败'))
       setStatus('')
     } finally {
       setUploading(false)
@@ -81,7 +82,11 @@ export function UploadForm({ onUploaded }: UploadFormProps) {
         </div>
       )}
       {status && <p className="status ok">{status}</p>}
-      {error && <p className="status err">{error}</p>}
+      {error && (
+        <pre className="status err" role="alert">
+          {error}
+        </pre>
+      )}
       <button type="submit" disabled={!file || uploading}>
         {uploading ? '上传中…' : '开始上传'}
       </button>

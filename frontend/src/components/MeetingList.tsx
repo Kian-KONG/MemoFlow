@@ -26,7 +26,11 @@ export function MeetingList({ meetings, loading, error, onRefresh }: MeetingList
           {loading ? '刷新中…' : '刷新'}
         </button>
       </div>
-      {error && <p className="list-error">{error}</p>}
+      {error && (
+        <pre className="list-error" role="alert">
+          {error}
+        </pre>
+      )}
       {!error && meetings.length === 0 && !loading && (
         <p className="list-empty">暂无会议，请先上传录音。</p>
       )}
