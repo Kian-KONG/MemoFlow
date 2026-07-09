@@ -106,6 +106,7 @@ echo "本地测试: ./scripts/smoke_test.sh $APP_URL"
 echo "正在创建 Cloudflare Quick Tunnel（下方会输出公网 URL）..."
 echo "提示: 链接是临时的，任何拿到 URL 的人都能访问。Ctrl+C 关闭。"
 echo "若外网 502，请确认本脚本终端未关闭，并查看 $LOG_FILE"
+echo "大文件上传易 524 超时：请在本机 $APP_URL 上传，或压缩音频后再经隧道传"
 echo ""
 
 cloudflared tunnel --url "$APP_URL"

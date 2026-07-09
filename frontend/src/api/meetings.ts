@@ -25,7 +25,10 @@ function parseXhrError(status: number, responseText: string): string {
     if (status === 502) {
       return 'Cloudflare 无法连接本机后端（502）。请确认 uvicorn 正在运行且隧道未断开。'
     }
-    return `服务器返回 HTML 而非 JSON（HTTP ${status}）`
+    if (status === 524) {
+      return 'Cloudflare 上传超时（524）。隧道对大文件/慢网络约 100 秒限制，请改在本机上传或缩小文件。'
+    }
+    return `服务器返回 HTML 而非 JSON（HTTP ${status}），多为 Cloudflare 网关错误页。`
   }
 
   try {

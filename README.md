@@ -138,6 +138,8 @@ chmod +x ./scripts/start_with_cloudflare_tunnel.sh
 
 终端会输出 `https://xxxx.trycloudflare.com`，在另一台电脑的浏览器打开即可。计算和模型仍在本机运行；关闭脚本后外网链接失效。
 
+**注意：** Quick Tunnel 单次请求超时约 100 秒。大会议录音（尤其 &gt;30MB）经隧道上传可能返回 **524**（Cloudflare 超时，页面显示 HTML 错误）。大文件请在本机 `http://127.0.0.1:8000` 上传，或先压缩/切分音频。
+
 ### 首次使用需要准备
 
 - **VibeVoice ASR**（本地权重）：

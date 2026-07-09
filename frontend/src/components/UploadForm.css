@@ -39,6 +39,17 @@
   color: #6b7280;
 }
 
+.tunnel-warn {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #c2410c;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 6px;
+  padding: 0.6rem 0.75rem;
+  line-height: 1.45;
+}
+
 .progress-wrap {
   position: relative;
   height: 1.5rem;

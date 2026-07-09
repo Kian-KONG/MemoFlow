@@ -5,6 +5,12 @@ import { formatApiError } from '../lib/apiError'
 import './UploadForm.css'
 
 const ACCEPT = '.mp3,.wav,.m4a,.flac,.ogg,audio/*'
+/** Cloudflare Quick Tunnel 整次请求（含上传）超时约 100s，大文件易 524。 */
+const TUNNEL_WARN_BYTES = 30 * 1024 * 1024
+
+function isCloudflareTunnel(): boolean {
+  return typeof window !== 'undefined' && window.location.hostname.endsWith('trycloudflare.com')
+}
 
 interface UploadFormProps {
   onUploaded: (meeting: Meeting) => void
@@ -75,6 +81,12 @@ export function UploadForm({ onUploaded }: UploadFormProps) {
         />
       </label>
       {file && <p className="file-meta">{file.name} · {(file.size / 1024 / 1024).toFixed(2)} MB</p>}
+      {file && isCloudflareTunnel() && file.size > TUNNEL_WARN_BYTES && (
+        <p className="tunnel-warn" role="status">
+          当前通过 Cloudflare 隧道访问，大文件上传可能超时 (524)。建议在本机打开
+          http://127.0.0.1:8000 上传，或压缩音频后再传。
+        </p>
+      )}
       {(uploading || percent > 0) && (
         <div className="progress-wrap">
           <div className="progress-bar" style={{ width: `${percent}%` }} />

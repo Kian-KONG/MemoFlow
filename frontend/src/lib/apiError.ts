@@ -4,6 +4,7 @@ const STATUS_HINTS: Record<number, string> = {
   502: '网关错误 (502)：后端未响应。请确认 uvicorn 已启动且 Cloudflare 隧道指向正确端口。',
   503: '服务不可用 (503)：后端可能正在启动或已崩溃，请查看终端日志。',
   504: '网关超时 (504)：请求耗时过长，长音频处理时可能出现。',
+  524: 'Cloudflare 超时 (524)：上传或处理耗时超过隧道限制（通常约 100 秒）。大文件请在本机 http://127.0.0.1:8000 上传，或压缩/切分音频后再通过隧道上传。',
 }
 
 export function statusHint(status: number): string {
