@@ -1,0 +1,148 @@
+.settings {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.settings-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 1.25rem;
+}
+
+.settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.settings-header h2,
+.settings-card > h2 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.settings-header button {
+  background: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 0.35rem 0.75rem;
+  font: inherit;
+  cursor: pointer;
+}
+
+.settings-header button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.settings-desc {
+  margin: 0.75rem 0;
+  font-size: 0.875rem;
+  color: #6b7280;
+  line-height: 1.45;
+}
+
+.settings-error {
+  color: #dc2626;
+  font-size: 0.9rem;
+}
+
+.status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.platform {
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+.badge {
+  font-size: 0.75rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-weight: 500;
+}
+
+.badge.ok {
+  background: #d1fae5;
+  color: #047857;
+}
+
+.badge.warn {
+  background: #ffedd5;
+  color: #c2410c;
+}
+
+.badge.neutral {
+  background: #e5e7eb;
+  color: #4b5563;
+}
+
+.settings-card h3 {
+  margin: 1rem 0 0.5rem;
+  font-size: 0.9rem;
+}
+
+.dep-list,
+.help-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.875rem;
+  line-height: 1.55;
+}
+
+.dep-list {
+  list-style: none;
+  padding-left: 0;
+}
+
+.dep-list .ok {
+  color: #059669;
+}
+
+.dep-list .bad {
+  color: #dc2626;
+}
+
+.model-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 0.85rem;
+  margin-top: 0.5rem;
+}
+
+.model-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.muted {
+  margin: 0.2rem 0 0;
+  font-size: 0.75rem;
+  color: #9ca3af;
+}
+
+.download-hint {
+  margin: 0.75rem 0 0;
+  padding: 0.65rem;
+  background: #f3f4f6;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  overflow-x: auto;
+}
+
+.help-list code {
+  font-size: 0.8rem;
+  background: #f3f4f6;
+  padding: 0.1rem 0.3rem;
+  border-radius: 3px;
+}

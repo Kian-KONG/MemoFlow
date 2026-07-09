@@ -39,7 +39,7 @@ class AudioValidationPolicy:
 
     @staticmethod
     def normalize_content_type(content_type: str, filename: str) -> str:
-        """浏览器 / NiceGUI 上传时经常只给 application/octet-stream，按扩展名推断真实 MIME。"""
+        """浏览器上传时经常只给 application/octet-stream，按扩展名推断真实 MIME。"""
         normalized = (content_type or "").strip().lower()
         if normalized in _ALLOWED_CONTENT_TYPES:
             return normalized

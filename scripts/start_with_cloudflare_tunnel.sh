@@ -6,6 +6,7 @@
 # 依赖:
 #   brew install cloudflared
 #   pip install -e ".[dev]"
+#   cd frontend && npm install && npm run build
 #
 # 另一台设备用终端输出的 https://xxxx.trycloudflare.com 访问。
 # Ctrl+C 停止隧道和应用。
@@ -17,6 +18,12 @@ cd "$ROOT"
 
 HOST="${MEMOFLOW_HOST:-127.0.0.1}"
 PORT="${MEMOFLOW_PORT:-8000}"
+
+if [[ ! -d frontend/dist ]]; then
+  echo "Error: 未找到 frontend/dist。请先构建前端:" >&2
+  echo "  cd frontend && npm install && npm run build" >&2
+  exit 1
+fi
 
 if [[ -f .env ]]; then
   # shellcheck disable=SC1091
