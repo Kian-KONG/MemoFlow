@@ -149,12 +149,16 @@ chmod +x ./scripts/start_with_cloudflare_tunnel.sh
   chmod +x ./scripts/download_asr_model.sh
   ./scripts/download_asr_model.sh   # Mac 默认下载 MOSS MLX (~1.8GB)
   ```
-  脚本会先对比远程文件大小与本地已有文件，**仅下载缺失部分**（真实断点续传），经 `hf-mirror` + `HF_HUB_DISABLE_XET=1` 走国内节点。确保 `.env` 中 `MEMOFLOW_ASR_MODEL_PATH` 与下载目录一致。
+  下载脚本**默认从 ModelScope 拉取**（国内推荐，支持断点续传）。`moss_hf` 与 `vibevoice` 分别对应 ModelScope 仓库 `OpenMOSS/MOSS-Transcribe-Diarize`、`microsoft/VibeVoice-ASR-HF`。若需改回 HuggingFace，可设 `USE_MODELSCOPE=0`。
 
-  可选后端（`.env`）：
-  - `MEMOFLOW_ASR_BACKEND=mlx_moss` — `vanch007/mlx-MOSS-Transcribe-Diarize`（Mac M 系列推荐）
-  - `MEMOFLOW_ASR_BACKEND=moss_hf` — `OpenMOSS-Team/MOSS-Transcribe-Diarize`
-  - `MEMOFLOW_ASR_BACKEND=vibevoice` — `microsoft/VibeVoice-ASR-HF`（~16.7GB，旧默认）
+  **`mlx_moss` 例外**：ModelScope 暂无 MLX 转换版，Mac 默认后端仍经 HF 镜像（`hf-mirror`）下载 `vanch007/mlx-MOSS-Transcribe-Diarize`。
+
+  确保 `.env` 中 `MEMOFLOW_ASR_MODEL_PATH` 与下载目录一致。
+
+  可选后端（`.env` 中 `MEMOFLOW_ASR_BACKEND`）：
+  - `mlx_moss` — `vanch007/mlx-MOSS-Transcribe-Diarize`（Mac M 系列推荐，HF 镜像）
+  - `moss_hf` — `OpenMOSS/MOSS-Transcribe-Diarize`（ModelScope）
+  - `vibevoice` — `microsoft/VibeVoice-ASR-HF`（ModelScope，~16.7GB）
 - **Bosch AIGC（推荐）**：在 `.env` 中配置 `BOSCH_AIGC_API_KEY`、`LLM_API_URL`、`EMBEDDING_API_URL`、`RERANKER_API_URL`。
 - 或分别配置 DeepSeek / OpenAI Embedding / Qwen3 Reranker 的 `MEMOFLOW_*` 密钥。
 

@@ -1,14 +1,21 @@
 """ASR 后端工厂：按配置装配 VibeVoice / MOSS HF / MOSS MLX。"""
 from __future__ import annotations
 
+from pathlib import Path
+
 from loguru import logger
 
 from memoflow.application.ports.asr_port import ASRPort
 from memoflow.config import Settings
-from memoflow.infrastructure.ai.asr_defaults import default_asr_backend, default_asr_model_id
+from memoflow.infrastructure.ai.asr_defaults import (
+    default_asr_backend,
+    default_asr_model_id,
+    default_asr_model_path,
+)
 from memoflow.infrastructure.ai.asr_status import (
     mlx_runtime_available,
     resolve_active_backend,
+    resolve_moss_hf_model_path,
     resolve_model_path,
 )
 
@@ -19,7 +26,19 @@ def build_asr(settings: Settings) -> ASRPort:
         configured = default_asr_backend()
 
     active = resolve_active_backend(configured)
-    model_path = resolve_model_path(active, settings.asr_model_path)
+    if active == "moss_hf":
+        model_path = resolve_moss_hf_model_path(
+            settings.asr_model_path,
+            configured_backend=configured,
+        )
+        if configured == "mlx_moss" and not mlx_runtime_available():
+            logger.warning(
+                "MLX 运行时不可用（moss_transcribe_diarize.mlx），已改用 moss_hf 加载本地权重。"
+                f"路径: {model_path}。"
+                "安装: pip install -e \".[mlx-moss-asr]\" 可启用 MLX。"
+            )
+    else:
+        model_path = resolve_model_path(active, settings.asr_model_path)
     model_id = settings.asr_model_id
 
     if active == "mlx_moss":
@@ -35,11 +54,6 @@ def build_asr(settings: Settings) -> ASRPort:
         return asr
 
     if active == "moss_hf":
-        if configured == "mlx_moss" and not mlx_runtime_available():
-            logger.warning(
-                "MLX 运行时不可用（moss_transcribe_diarize.mlx），已用 moss_hf 加载本地权重。"
-                "安装: pip install -e \".[mlx-moss-asr]\" 可启用 MLX。"
-            )
         from memoflow.infrastructure.ai.moss_hf_asr import MossHFASR
 
         hf_model_id = model_id
@@ -67,3 +81,18 @@ def build_asr(settings: Settings) -> ASRPort:
         f"未知 ASR 后端: {active!r}。"
         "可选: mlx_moss | moss_hf | vibevoice | auto"
     )
+
+
+def build_asr_for_backend(settings: Settings, backend: str) -> ASRPort:
+    """按指定后端构建 ASR 实例（覆盖 settings 中的 asr_backend / 路径）。"""
+    backend = backend.strip().lower()
+    if backend not in {"mlx_moss", "moss_hf", "vibevoice"}:
+        raise ValueError(f"未知 ASR 后端: {backend!r}")
+    overridden = settings.model_copy(
+        update={
+            "asr_backend": backend,
+            "asr_model_path": Path(default_asr_model_path(backend)),
+            "asr_model_id": default_asr_model_id(backend),
+        }
+    )
+    return build_asr(overridden)

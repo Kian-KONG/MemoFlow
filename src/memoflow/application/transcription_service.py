@@ -1,4 +1,4 @@
-"""转写应用服务：编排 VibeVoice ASR + 转写组装。"""
+"""转写应用服务：编排 ASR + 转写组装。"""
 from __future__ import annotations
 
 import asyncio
@@ -20,6 +20,19 @@ from memoflow.domain.transcript.services import (
 from memoflow.domain.transcript.value_objects import TranscriptId
 from memoflow.infrastructure.audio.ffmpeg import prepare_audio_for_asr
 
+_BACKEND_LABELS = {
+    "mlx_moss": "MOSS MLX",
+    "moss_hf": "MOSS HF",
+    "vibevoice": "VibeVoice",
+}
+
+
+def _asr_backend_label(asr: ASRPort) -> str:
+    key = getattr(asr, "_backend_key", None)
+    if key:
+        return _BACKEND_LABELS.get(key, str(key))
+    return getattr(asr, "source", "ASR")
+
 
 class TranscriptionApplicationService:
     def __init__(
@@ -30,6 +43,9 @@ class TranscriptionApplicationService:
     ) -> None:
         self._uow_factory = uow_factory
         self._file_storage = file_storage
+        self._asr = asr
+
+    def set_asr(self, asr: ASRPort) -> None:
         self._asr = asr
 
     async def run_asr_if_needed(self, meeting_id: str) -> Transcript | None:
@@ -59,7 +75,8 @@ class TranscriptionApplicationService:
             await uow.meetings.save(meeting)
             await uow.commit()
 
-        logger.info(f"[{meeting_id}] 开始语音识别（VibeVoice）...")
+        backend = _asr_backend_label(self._asr)
+        logger.info(f"[{meeting_id}] 开始语音识别（{backend}）...")
         asr_input, cleanup = await asyncio.to_thread(prepare_audio_for_asr, audio_path)
         try:
             asr_result = await self._asr.transcribe(str(asr_input))
@@ -95,7 +112,7 @@ class TranscriptionApplicationService:
         return transcript
 
     async def run_diarization_if_needed(self, meeting_id: str) -> TranscriptDTO:
-        """说话人识别阶段：VibeVoice 已在 ASR 中标注说话人，此处仅推进状态。"""
+        """说话人识别阶段：ASR 已在转写中标注说话人，此处仅推进状态。"""
         async with self._uow_factory() as uow:
             meeting = await uow.meetings.get(MeetingId(meeting_id))
             if meeting is None:
@@ -112,7 +129,8 @@ class TranscriptionApplicationService:
             if transcript.speakers:
                 logger.info(f"[{meeting_id}] 跳过说话人识别，使用已有说话人缓存")
             else:
-                logger.info(f"[{meeting_id}] VibeVoice 已在转写阶段标注说话人，推进状态")
+                backend = _asr_backend_label(self._asr)
+                logger.info(f"[{meeting_id}] {backend} 已在转写阶段标注说话人，推进状态")
 
             meeting.complete_diarization()
             await uow.meetings.save(meeting)

@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # 下载 / 检测 MLX 版 MOSS-Transcribe-Diarize（Mac M 系列推荐，~1.8GB）
 #
+# 注意：MLX 版权重仅发布在 Hugging Face，ModelScope 无对应模型。
+# 也可统一使用: MEMOFLOW_ASR_BACKEND=mlx_moss ./scripts/download_asr_model.sh
+# （download_asr_model.sh 会自动识别 mlx_moss 并走 HF 镜像，忽略 USE_MODELSCOPE）
+#
 # 模型页:
 #   https://huggingface.co/vanch007/mlx-MOSS-Transcribe-Diarize
 #   https://hf-mirror.com/vanch007/mlx-MOSS-Transcribe-Diarize  （国内镜像，已同步）

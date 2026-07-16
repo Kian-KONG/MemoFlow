@@ -3,13 +3,16 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from memoflow.application.system_service import ModelKey, ModelService
-from memoflow.interfaces.api.deps import get_system_service
+from memoflow.application.system_service import ModelKey, ModelNotReadyError, ModelService
+from memoflow.container import AppContainer
+from memoflow.interfaces.api.deps import get_container, get_system_service
 from memoflow.interfaces.api.schemas import (
     AsrOptionStatusResponse,
     DependencyStatusResponse,
     ModelDownloadResponse,
     ModelStatusResponse,
+    SelectAsrBackendRequest,
+    SelectAsrBackendResponse,
     SystemStatusResponse,
 )
 
@@ -69,6 +72,31 @@ async def get_system_status(
     service: ModelService = Depends(get_system_service),
 ) -> SystemStatusResponse:
     return _to_response(service)
+
+
+@router.put("/asr-backend", response_model=SelectAsrBackendResponse, summary="选择 ASR 模型后端")
+async def select_asr_backend(
+    body: SelectAsrBackendRequest,
+    service: ModelService = Depends(get_system_service),
+    container: AppContainer = Depends(get_container),
+) -> SelectAsrBackendResponse:
+    backend = body.backend.strip().lower()
+    try:
+        active = container.switch_asr_backend(backend)
+    except ModelNotReadyError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    status = _to_response(service)
+    spec = next((o for o in status.asr_options if o.backend == backend), None)
+    label = spec.label if spec else backend
+    return SelectAsrBackendResponse(
+        backend=backend,
+        active_asr_backend=active,
+        message=f"已切换至 {label}",
+        status=status,
+    )
 
 
 @router.post(

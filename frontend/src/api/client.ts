@@ -94,6 +94,28 @@ export async function apiPostJson<T>(path: string, body?: unknown): Promise<T> {
   return (await response.json()) as T
 }
 
+export async function apiPutJson<T>(path: string, body: unknown): Promise<T> {
+  let response: Response
+  try {
+    response = await fetch(path, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+  } catch (err) {
+    throw err instanceof TypeError
+      ? err
+      : new Error(err instanceof Error ? err.message : '网络请求失败')
+  }
+
+  if (!response.ok) {
+    const bodyPreview = await readBodyPreview(response)
+    const message = await parseError(response, bodyPreview)
+    throw new ApiError(response.status, message, bodyPreview)
+  }
+  return (await response.json()) as T
+}
+
 /** 探测后端是否可达（用于页面顶部状态条）。 */
 export async function probeBackend(): Promise<{ ok: boolean; detail: string }> {
   try {

@@ -110,6 +110,13 @@ export interface AsrOptionStatus {
   hint: string
 }
 
+export interface SelectAsrBackendResponse {
+  backend: string
+  active_asr_backend: string
+  message: string
+  status: SystemStatus
+}
+
 export interface SystemStatus {
   platform: string
   all_ready: boolean

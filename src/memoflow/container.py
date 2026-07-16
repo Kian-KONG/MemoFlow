@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
 from sqlalchemy.ext.asyncio import AsyncEngine
 
@@ -29,7 +30,11 @@ from memoflow.domain.shared.events import EventDispatcher
 from memoflow.infrastructure.ai.deepseek_llm import DeepSeekLLM
 from memoflow.infrastructure.ai.openai_embedding import OpenAIEmbedding
 from memoflow.infrastructure.ai.qwen_reranker import QwenReranker
-from memoflow.infrastructure.ai.asr_factory import build_asr
+from memoflow.infrastructure.ai.asr_factory import build_asr, build_asr_for_backend
+from memoflow.infrastructure.config.runtime_preferences import RuntimePreferences
+from memoflow.infrastructure.ai.asr_defaults import default_asr_model_id, default_asr_model_path
+from memoflow.infrastructure.ai.asr_status import backend_spec, resolve_model_path, weights_present
+from memoflow.application.system_service import ModelNotReadyError
 from memoflow.infrastructure.persistence.db import create_engine, create_session_factory
 from memoflow.infrastructure.persistence.unit_of_work import SqlAlchemyUnitOfWork
 from memoflow.infrastructure.storage.file_storage import LocalFileStorage
@@ -58,10 +63,47 @@ class AppContainer:
 
     pipeline: MeetingProcessingPipeline
     pipeline_runner: PipelineRunner
+    runtime_prefs: RuntimePreferences
+
+    def switch_asr_backend(self, backend: str) -> str:
+        """热切换 ASR 后端并持久化用户选择。"""
+        backend = backend.strip().lower()
+        if backend_spec(backend) is None:
+            raise ValueError(f"未知 ASR 后端: {backend}")
+
+        model_path = resolve_model_path(backend, Path(default_asr_model_path(backend)))
+        if not weights_present(backend, model_path):
+            spec = backend_spec(backend)
+            script = spec.download_script if spec else "./scripts/download_asr_model.sh"
+            raise ModelNotReadyError(
+                f"{spec.label if spec else backend} 权重未就绪（{model_path}）。"
+                f"请先运行: MEMOFLOW_ASR_BACKEND={backend} {script}"
+            )
+
+        new_asr = build_asr_for_backend(self.settings, backend)
+        active = getattr(new_asr, "_backend_key", backend)
+
+        self.asr = new_asr
+        self.transcription_service.set_asr(new_asr)
+        self.system_service.set_asr(new_asr)
+        self.runtime_prefs.save_asr_backend(backend)
+        return str(active)
 
 
 def build_container(settings: Settings) -> AppContainer:
     settings.ensure_directories()
+
+    runtime_prefs = RuntimePreferences.load(settings.data_dir)
+    if runtime_prefs.asr_backend:
+        effective_settings = settings.model_copy(
+            update={
+                "asr_backend": runtime_prefs.asr_backend,
+                "asr_model_path": Path(default_asr_model_path(runtime_prefs.asr_backend)),
+                "asr_model_id": default_asr_model_id(runtime_prefs.asr_backend),
+            }
+        )
+    else:
+        effective_settings = settings
 
     engine = create_engine(settings.database_url)
     session_factory = create_session_factory(engine)
@@ -73,7 +115,7 @@ def build_container(settings: Settings) -> AppContainer:
 
     # ---- 基础设施适配器（均可替换）----
     file_storage: FileStoragePort = LocalFileStorage(settings.audio_dir)
-    asr: ASRPort = build_asr(settings)
+    asr: ASRPort = build_asr(effective_settings)
     llm: LLMPort = DeepSeekLLM(
         api_key=settings.resolved_llm_api_key,
         base_url=settings.resolved_llm_base_url,
@@ -107,7 +149,7 @@ def build_container(settings: Settings) -> AppContainer:
         reranker=reranker,
         rerank_top_n=settings.rerank_top_n,
     )
-    system_service = ModelService(settings, asr)
+    system_service = ModelService(settings, asr, runtime_prefs=runtime_prefs)
 
     pipeline = MeetingProcessingPipeline(
         uow_factory, transcription_service, summary_service, knowledge_service, system_service
@@ -134,4 +176,5 @@ def build_container(settings: Settings) -> AppContainer:
         system_service=system_service,
         pipeline=pipeline,
         pipeline_runner=pipeline_runner,
+        runtime_prefs=runtime_prefs,
     )

@@ -133,3 +133,14 @@ class SystemStatusResponse(BaseModel):
     dependencies: list[DependencyStatusResponse]
     models: list[ModelStatusResponse]
     asr_options: list[AsrOptionStatusResponse] = []
+
+
+class SelectAsrBackendRequest(BaseModel):
+    backend: str
+
+
+class SelectAsrBackendResponse(BaseModel):
+    backend: str
+    active_asr_backend: str
+    message: str
+    status: SystemStatusResponse

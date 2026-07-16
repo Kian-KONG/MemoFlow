@@ -10,6 +10,7 @@ from pathlib import Path
 from memoflow.application.ports.asr_port import ASRPort
 from memoflow.config import Settings
 from memoflow.infrastructure.ai.asr_defaults import default_asr_backend, default_asr_model_path
+from memoflow.infrastructure.config.runtime_preferences import RuntimePreferences
 from memoflow.infrastructure.ai.asr_status import (
     ASR_BACKENDS,
     backend_spec,
@@ -80,13 +81,28 @@ class ModelNotReadyError(RuntimeError):
 
 
 class ModelService:
-    def __init__(self, settings: Settings, asr: ASRPort) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        asr: ASRPort,
+        *,
+        runtime_prefs: RuntimePreferences | None = None,
+    ) -> None:
         self._settings = settings
         self._asr = asr
+        self._runtime_prefs = runtime_prefs
+
+    def set_asr(self, asr: ASRPort) -> None:
+        self._asr = asr
+
+    def _configured_backend(self) -> str:
+        if self._runtime_prefs and self._runtime_prefs.asr_backend:
+            return self._runtime_prefs.asr_backend
+        return (self._settings.asr_backend or "auto").strip().lower()
 
     def get_status(self) -> SystemStatusDTO:
         dependencies = self._check_dependencies()
-        configured = (self._settings.asr_backend or "auto").strip().lower()
+        configured = self._configured_backend()
         active = getattr(self._asr, "_backend_key", None) or resolve_active_backend(configured)
         asr_options = self._check_asr_options(configured, active)
         models = self._check_models(configured, active)
@@ -118,7 +134,8 @@ class ModelService:
             roles = "、".join(missing)
             raise ModelNotReadyError(
                 f"以下依赖尚未就绪：{roles}。"
-                f"请配置 API 密钥并运行 {_DOWNLOAD_SCRIPT} 下载 ASR 模型。"
+                f"请配置 API 密钥并运行 {_DOWNLOAD_SCRIPT} 下载 ASR 模型"
+                f"（moss_hf / vibevoice 默认 ModelScope，mlx_moss 经 HF 镜像）。"
             )
 
     async def download_model(self, key: ModelKey) -> None:
@@ -185,7 +202,14 @@ class ModelService:
             status, hint = "未加载", f"模型文件已存在（{model_path}），处理会议时将自动加载"
         else:
             script = spec.download_script if spec else _DOWNLOAD_SCRIPT
-            status, hint = "未找到", f"请运行 {script} 下载权重到 {model_path}"
+            if active == "mlx_moss":
+                dl_hint = f"请运行 {script} 经 HF 镜像下载权重到 {model_path}"
+            else:
+                dl_hint = (
+                    f"请运行 MEMOFLOW_ASR_BACKEND={active} {script} "
+                    f"从 ModelScope 下载权重到 {model_path}（USE_MODELSCOPE=0 可回退 HF）"
+                )
+            status, hint = "未找到", dl_hint
 
         if configured == "mlx_moss" and active == "moss_hf" and not mlx_runtime_available():
             hint = (
@@ -219,10 +243,15 @@ class ModelService:
                 path = Path(default_asr_model_path(spec.key))
             ready = weights_present(spec.key, path)
             hints: list[str] = []
-            if spec.key == "mlx_moss" and not mlx_runtime_available():
-                hints.append("需 pip install -e \".[mlx-moss-asr]\"（上游 MLX 模块尚未发布时可改用 moss_hf）")
-            if spec.key == "moss_hf":
+            if spec.key == "mlx_moss":
+                hints.append("下载源: HuggingFace 镜像（ModelScope 无 MLX 转换版）")
+                if not mlx_runtime_available():
+                    hints.append("需 pip install -e \".[mlx-moss-asr]\"（上游 MLX 模块尚未发布时可改用 moss_hf）")
+            elif spec.key == "moss_hf":
+                hints.append("下载源: ModelScope（OpenMOSS/MOSS-Transcribe-Diarize）")
                 hints.append('需 pip install -e ".[moss-asr]"')
+            elif spec.key == "vibevoice":
+                hints.append("下载源: ModelScope（microsoft/VibeVoice-ASR-HF）")
             if not ready:
                 hints.append(f"运行: {download_command(spec).splitlines()[-1]}")
             options.append(
