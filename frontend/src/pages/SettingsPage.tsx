@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { getSystemStatus, selectAsrBackend } from '../api/system'
 import type { SystemStatus } from '../api/types'
+import { formatApiError } from '../lib/apiError'
 import './SettingsPage.css'
 
 export function SettingsPage() {
@@ -17,7 +18,7 @@ export function SettingsPage() {
       const data = await getSystemStatus()
       setStatus(data)
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+      setError(formatApiError(err, '加载系统状态失败'))
     } finally {
       setLoading(false)
     }
@@ -36,7 +37,7 @@ export function SettingsPage() {
       setStatus(result.status)
       setSuccess(result.message)
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+      setError(formatApiError(err, '切换模型失败'))
     } finally {
       setSelecting(null)
     }
@@ -144,23 +145,25 @@ export function SettingsPage() {
         <h2>配置说明</h2>
         <ul className="help-list">
           <li>
-            <strong>模型切换</strong>: 在上方点击「使用此模型」即可切换；也可在{' '}
-            <code>.env</code> 设置默认 <code>MEMOFLOW_ASR_BACKEND</code>
+            <strong>模型切换</strong>: 在上方点击「使用此模型」；偏好保存在{' '}
+            <code>data/runtime_preferences.json</code>
           </li>
           <li>
-            <strong>ffmpeg</strong>: 终端运行 <code>brew install ffmpeg</code>（处理 m4a/mp3 必需）
+            <strong>统一下载</strong>: <code>./scripts/download_asr_model.sh</code>（moss_hf /
+            vibevoice 默认 ModelScope；Mac mlx_moss 走 HF 镜像）
           </li>
           <li>
-            <strong>统一下载</strong>: <code>./scripts/download_asr_model.sh</code>（默认 ModelScope）
+            <strong>MOSS MLX</strong>: <code>pip install -e &quot;.[mlx-moss-asr]&quot;</code>
           </li>
           <li>
-            <strong>MOSS MLX</strong>: 仅 HF 镜像 — <code>vanch007/mlx-MOSS-Transcribe-Diarize</code>
+            <strong>MOSS HF</strong>: <code>pip install -e &quot;.[moss-asr]&quot;</code>
           </li>
           <li>
-            <strong>MOSS HF</strong>: ModelScope <code>OpenMOSS/MOSS-Transcribe-Diarize</code>
+            <strong>ffmpeg</strong>: <code>brew install ffmpeg</code>
           </li>
           <li>
-            <strong>VibeVoice</strong>: ModelScope <code>microsoft/VibeVoice-ASR-HF</code>
+            <strong>API</strong>: 配置 <code>BOSCH_AIGC_API_KEY</code> 可统一覆盖 LLM /
+            Embedding / Rerank
           </li>
         </ul>
       </section>

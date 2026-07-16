@@ -95,11 +95,12 @@ def build_container(settings: Settings) -> AppContainer:
 
     runtime_prefs = RuntimePreferences.load(settings.data_dir)
     if runtime_prefs.asr_backend:
+        backend = runtime_prefs.asr_backend
         effective_settings = settings.model_copy(
             update={
-                "asr_backend": runtime_prefs.asr_backend,
-                "asr_model_path": Path(default_asr_model_path(runtime_prefs.asr_backend)),
-                "asr_model_id": default_asr_model_id(runtime_prefs.asr_backend),
+                "asr_backend": backend,
+                "asr_model_path": resolve_model_path(backend, settings.asr_model_path),
+                "asr_model_id": default_asr_model_id(backend),
             }
         )
     else:

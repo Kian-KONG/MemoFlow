@@ -10,23 +10,27 @@ export class ApiError extends Error {
   }
 }
 
-async function readBodyPreview(response: Response): Promise<string> {
+function previewBody(text: string, max = 200): string {
+  const trimmed = text.trim()
+  if (!trimmed) return ''
+  return trimmed.length > max ? `${trimmed.slice(0, max)}…` : trimmed
+}
+
+async function readResponseBody(response: Response): Promise<string> {
   try {
-    const text = await response.text()
-    const trimmed = text.trim()
-    if (!trimmed) return ''
-    return trimmed.length > 200 ? `${trimmed.slice(0, 200)}…` : trimmed
+    return await response.text()
   } catch {
     return ''
   }
 }
 
-async function parseError(response: Response, bodyPreview: string): Promise<string> {
+async function parseError(response: Response, bodyText: string): Promise<string> {
+  const trimmed = bodyText.trim()
   const contentType = response.headers.get('content-type') ?? ''
 
-  if (contentType.includes('application/json') && bodyPreview) {
+  if (contentType.includes('application/json') && trimmed) {
     try {
-      const data = JSON.parse(bodyPreview) as { detail?: unknown }
+      const data = JSON.parse(trimmed) as { detail?: unknown }
       if (typeof data.detail === 'string') return data.detail
       if (Array.isArray(data.detail)) {
         return data.detail
@@ -40,7 +44,7 @@ async function parseError(response: Response, bodyPreview: string): Promise<stri
     }
   }
 
-  if (contentType.includes('text/html') || bodyPreview.startsWith('<!')) {
+  if (contentType.includes('text/html') || trimmed.startsWith('<!')) {
     if (response.status === 502) {
       return 'Cloudflare 无法连接本机后端（502）。请确认 uvicorn 正在运行且隧道未断开。'
     }
@@ -50,33 +54,15 @@ async function parseError(response: Response, bodyPreview: string): Promise<stri
     return `服务器返回 HTML 而非 JSON（HTTP ${response.status}），多为 Cloudflare 网关错误页。`
   }
 
-  if (bodyPreview) return bodyPreview
+  if (trimmed) return previewBody(trimmed)
   return response.statusText || `HTTP ${response.status}`
 }
 
-export async function apiGet<T>(path: string): Promise<T> {
-  let response: Response
-  try {
-    response = await fetch(path)
-  } catch (err) {
-    throw err instanceof TypeError
-      ? err
-      : new Error(err instanceof Error ? err.message : '网络请求失败')
-  }
-
-  if (!response.ok) {
-    const bodyPreview = await readBodyPreview(response)
-    const message = await parseError(response, bodyPreview)
-    throw new ApiError(response.status, message, bodyPreview)
-  }
-  return (await response.json()) as T
-}
-
-export async function apiPostJson<T>(path: string, body?: unknown): Promise<T> {
+async function requestJson<T>(method: string, path: string, body?: unknown): Promise<T> {
   let response: Response
   try {
     response = await fetch(path, {
-      method: 'POST',
+      method,
       headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
       body: body === undefined ? undefined : JSON.stringify(body),
     })
@@ -87,33 +73,24 @@ export async function apiPostJson<T>(path: string, body?: unknown): Promise<T> {
   }
 
   if (!response.ok) {
-    const bodyPreview = await readBodyPreview(response)
-    const message = await parseError(response, bodyPreview)
-    throw new ApiError(response.status, message, bodyPreview)
+    const bodyText = await readResponseBody(response)
+    const message = await parseError(response, bodyText)
+    throw new ApiError(response.status, message, previewBody(bodyText))
   }
+
   return (await response.json()) as T
 }
 
-export async function apiPutJson<T>(path: string, body: unknown): Promise<T> {
-  let response: Response
-  try {
-    response = await fetch(path, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    })
-  } catch (err) {
-    throw err instanceof TypeError
-      ? err
-      : new Error(err instanceof Error ? err.message : '网络请求失败')
-  }
+export async function apiGet<T>(path: string): Promise<T> {
+  return requestJson<T>('GET', path)
+}
 
-  if (!response.ok) {
-    const bodyPreview = await readBodyPreview(response)
-    const message = await parseError(response, bodyPreview)
-    throw new ApiError(response.status, message, bodyPreview)
-  }
-  return (await response.json()) as T
+export async function apiPostJson<T>(path: string, body?: unknown): Promise<T> {
+  return requestJson<T>('POST', path, body)
+}
+
+export async function apiPutJson<T>(path: string, body: unknown): Promise<T> {
+  return requestJson<T>('PUT', path, body)
 }
 
 /** 探测后端是否可达（用于页面顶部状态条）。 */

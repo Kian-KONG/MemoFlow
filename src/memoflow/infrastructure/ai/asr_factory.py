@@ -1,7 +1,6 @@
 """ASR 后端工厂：按配置装配 VibeVoice / MOSS HF / MOSS MLX。"""
 from __future__ import annotations
 
-from pathlib import Path
 
 from loguru import logger
 
@@ -10,8 +9,8 @@ from memoflow.config import Settings
 from memoflow.infrastructure.ai.asr_defaults import (
     default_asr_backend,
     default_asr_model_id,
-    default_asr_model_path,
 )
+from memoflow.infrastructure.ai.asr_model_sources import BACKENDS
 from memoflow.infrastructure.ai.asr_status import (
     mlx_runtime_available,
     resolve_active_backend,
@@ -21,11 +20,9 @@ from memoflow.infrastructure.ai.asr_status import (
 
 
 def build_asr(settings: Settings) -> ASRPort:
-    configured = (settings.asr_backend or "auto").strip().lower()
-    if configured == "auto":
-        configured = default_asr_backend()
-
-    active = resolve_active_backend(configured)
+    configured_raw = (settings.asr_backend or "auto").strip().lower()
+    configured = configured_raw if configured_raw != "auto" else default_asr_backend()
+    active = resolve_active_backend(configured_raw)
     if active == "moss_hf":
         model_path = resolve_moss_hf_model_path(
             settings.asr_model_path,
@@ -86,12 +83,12 @@ def build_asr(settings: Settings) -> ASRPort:
 def build_asr_for_backend(settings: Settings, backend: str) -> ASRPort:
     """按指定后端构建 ASR 实例（覆盖 settings 中的 asr_backend / 路径）。"""
     backend = backend.strip().lower()
-    if backend not in {"mlx_moss", "moss_hf", "vibevoice"}:
+    if backend not in BACKENDS:
         raise ValueError(f"未知 ASR 后端: {backend!r}")
     overridden = settings.model_copy(
         update={
             "asr_backend": backend,
-            "asr_model_path": Path(default_asr_model_path(backend)),
+            "asr_model_path": resolve_model_path(backend, settings.asr_model_path),
             "asr_model_id": default_asr_model_id(backend),
         }
     )

@@ -18,19 +18,13 @@ from memoflow.domain.transcript.services import (
     TranscriptAssemblyService,
 )
 from memoflow.domain.transcript.value_objects import TranscriptId
+from memoflow.infrastructure.ai.asr_status import backend_short_name
 from memoflow.infrastructure.audio.ffmpeg import prepare_audio_for_asr
-
-_BACKEND_LABELS = {
-    "mlx_moss": "MOSS MLX",
-    "moss_hf": "MOSS HF",
-    "vibevoice": "VibeVoice",
-}
-
 
 def _asr_backend_label(asr: ASRPort) -> str:
     key = getattr(asr, "_backend_key", None)
     if key:
-        return _BACKEND_LABELS.get(key, str(key))
+        return backend_short_name(str(key))
     return getattr(asr, "source", "ASR")
 
 

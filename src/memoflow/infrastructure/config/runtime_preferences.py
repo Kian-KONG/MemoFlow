@@ -5,7 +5,7 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
-_VALID_BACKENDS = frozenset({"mlx_moss", "moss_hf", "vibevoice"})
+from memoflow.infrastructure.ai.asr_model_sources import BACKENDS
 
 
 @dataclass
@@ -29,13 +29,13 @@ class RuntimePreferences:
         backend = raw.get("asr_backend")
         if isinstance(backend, str):
             backend = backend.strip().lower()
-            if backend in _VALID_BACKENDS:
+            if backend in BACKENDS:
                 return cls(data_dir=data_dir, asr_backend=backend)
         return cls(data_dir=data_dir)
 
     def save_asr_backend(self, backend: str) -> None:
         backend = backend.strip().lower()
-        if backend not in _VALID_BACKENDS:
+        if backend not in BACKENDS:
             raise ValueError(f"未知 ASR 后端: {backend}")
         self.asr_backend = backend
         self.data_dir.mkdir(parents=True, exist_ok=True)

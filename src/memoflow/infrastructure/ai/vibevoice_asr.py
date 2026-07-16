@@ -3,7 +3,7 @@
 VibeVoice-ASR 在单次推理中同时完成语音识别、说话人分离与时间戳标注，
 输出 Who / When / What 结构化结果，可替代 SenseVoice + pyannote 双模型流水线。
 
-模型需预先下载到本地目录（见 scripts/download_vibevoice_asr.sh）；推理时不触发下载。
+模型需预先下载到本地目录（见 scripts/download_asr_model.sh）；推理时不触发下载。
 """
 from __future__ import annotations
 
@@ -79,7 +79,7 @@ class VibeVoiceASR(ASRPort):
     def _missing_model_message(self) -> str:
         return (
             f"VibeVoice-ASR 模型文件未找到（{self._model_path}）。"
-            "请先运行: ./scripts/download_vibevoice_asr.sh"
+            "请先运行: ./scripts/download_asr_model.sh"
         )
 
     def _resolve_load_path(self) -> str:

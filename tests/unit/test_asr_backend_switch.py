@@ -4,8 +4,6 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from memoflow.application.ports.asr_port import ASRPort, ASRResult, ASRSegment
 from memoflow.application.system_service import ModelService
 from memoflow.config import Settings

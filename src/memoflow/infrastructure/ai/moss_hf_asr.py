@@ -12,20 +12,12 @@ from memoflow.infrastructure.ai.moss_transcript import moss_speaker_label, parse
 from memoflow.infrastructure.ai.progress import ProgressCallback, report_progress
 
 _SOURCE = "OpenMOSS/HF"
-_MODEL_MARKERS = (
-    "config.json",
-    "model.safetensors",
-    "model-00000-of-00001.safetensors",
-)
 
 
 def model_files_present(model_path: str | Path) -> bool:
-    path = Path(model_path).expanduser()
-    if not path.is_dir():
-        return False
-    if not (path / "config.json").is_file():
-        return False
-    return any((path / name).is_file() for name in _MODEL_MARKERS[1:])
+    from memoflow.infrastructure.ai.asr_status import weights_present
+
+    return weights_present("moss_hf", Path(model_path).expanduser())
 
 
 def _resolve_device(device: str) -> str:

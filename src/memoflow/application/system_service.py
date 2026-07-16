@@ -21,7 +21,7 @@ from memoflow.infrastructure.ai.asr_status import (
     weights_present,
 )
 
-_DOWNLOAD_SCRIPT = "./scripts/download_asr_model.sh"
+from memoflow.infrastructure.ai.asr_model_sources import DOWNLOAD_SCRIPT, backend_role_label
 
 
 @dataclass(frozen=True)
@@ -119,11 +119,12 @@ class ModelService:
 
     def get_missing_for_processing(self) -> list[str]:
         """返回尚未就绪、会导致处理失败的依赖或模型名称列表。"""
+        status = self.get_status()
         missing: list[str] = []
-        for dep in self.get_status().dependencies:
+        for dep in status.dependencies:
             if not dep.available:
                 missing.append(dep.name)
-        for model in self.get_status().models:
+        for model in status.models:
             if not model.ready:
                 missing.append(model.role)
         return missing
@@ -134,19 +135,9 @@ class ModelService:
             roles = "、".join(missing)
             raise ModelNotReadyError(
                 f"以下依赖尚未就绪：{roles}。"
-                f"请配置 API 密钥并运行 {_DOWNLOAD_SCRIPT} 下载 ASR 模型"
+                f"请配置 API 密钥并运行 {DOWNLOAD_SCRIPT} 下载 ASR 模型"
                 f"（moss_hf / vibevoice 默认 ModelScope，mlx_moss 经 HF 镜像）。"
             )
-
-    async def download_model(self, key: ModelKey) -> None:
-        raise RuntimeError(
-            f"模型下载已改为脚本方式，请运行: {_DOWNLOAD_SCRIPT}"
-        )
-
-    async def download_all(self) -> None:
-        raise RuntimeError(
-            f"模型下载已改为脚本方式，请运行: {_DOWNLOAD_SCRIPT}"
-        )
 
     def _check_dependencies(self) -> list[DependencyStatus]:
         ffmpeg_ok = shutil.which("ffmpeg") is not None
@@ -192,16 +183,16 @@ class ModelService:
         files_present = self._asr_files_present()
         loaded = self._asr_loaded()
         model_path = str(getattr(self._asr, "model_path", self._settings.asr_model_path))
-        model_id = self._settings.asr_model_id or model_path
-        role = self._asr_role_label(active)
         spec = backend_spec(active)
+        model_id = spec.model_id if spec else model_path
+        role = backend_role_label(active)
 
         if loaded:
             status, hint = "已就绪", f"{role} 已加载到内存"
         elif files_present:
             status, hint = "未加载", f"模型文件已存在（{model_path}），处理会议时将自动加载"
         else:
-            script = spec.download_script if spec else _DOWNLOAD_SCRIPT
+            script = spec.download_script if spec else DOWNLOAD_SCRIPT
             if active == "mlx_moss":
                 dl_hint = f"请运行 {script} 经 HF 镜像下载权重到 {model_path}"
             else:
@@ -270,22 +261,15 @@ class ModelService:
             )
         return options
 
-    @staticmethod
-    def _asr_role_label(backend: str) -> str:
-        labels = {
-            "mlx_moss": "语音识别 (MOSS MLX)",
-            "moss_hf": "语音识别 (MOSS HF)",
-            "vibevoice": "语音识别 (VibeVoice ASR)",
-        }
-        return labels.get(backend, f"语音识别 ({backend})")
-
     def _asr_files_present(self) -> bool:
+        active = getattr(self._asr, "_backend_key", None) or resolve_active_backend(
+            self._configured_backend()
+        )
+        path = getattr(self._asr, "model_path", self._settings.asr_model_path)
         is_ready = getattr(self._asr, "is_ready", None)
         if is_ready is not None:
             return bool(is_ready)
-        from memoflow.infrastructure.ai.vibevoice_asr import model_files_present
-
-        return model_files_present(self._settings.asr_model_path)
+        return weights_present(active, path)
 
     def _asr_loaded(self) -> bool:
         if hasattr(self._asr, "is_loaded"):

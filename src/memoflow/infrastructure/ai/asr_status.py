@@ -5,11 +5,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
-from memoflow.infrastructure.ai.asr_defaults import (
-    default_asr_backend,
-    default_asr_model_id,
-    default_asr_model_path,
+from memoflow.infrastructure.ai.asr_defaults import default_asr_backend, default_asr_model_path
+from memoflow.infrastructure.ai.asr_model_sources import (
+    DOWNLOAD_SCRIPT,
+    catalog_model_id,
+    get_source,
 )
+
+_MOSS_HF_CONFIG = "configuration_moss_transcribe_diarize.py"
 
 
 @dataclass(frozen=True)
@@ -22,35 +25,24 @@ class AsrBackendSpec:
     source: str
 
 
-_DOWNLOAD_SCRIPT = "./scripts/download_asr_model.sh"
-_MOSS_HF_CONFIG = "configuration_moss_transcribe_diarize.py"
+def _build_backend_specs() -> tuple[AsrBackendSpec, ...]:
+    specs: list[AsrBackendSpec] = []
+    for backend in ("mlx_moss", "moss_hf", "vibevoice"):
+        src = get_source(backend)
+        specs.append(
+            AsrBackendSpec(
+                key=backend,
+                label=src.label,
+                model_id=catalog_model_id(backend),
+                default_path=src.default_local_dir,
+                download_script=DOWNLOAD_SCRIPT,
+                source=src.source,
+            )
+        )
+    return tuple(specs)
 
-ASR_BACKENDS: tuple[AsrBackendSpec, ...] = (
-    AsrBackendSpec(
-        key="mlx_moss",
-        label="MOSS MLX（Mac 推荐，~1.8GB）",
-        model_id="vanch007/mlx-MOSS-Transcribe-Diarize",
-        default_path=default_asr_model_path("mlx_moss"),
-        download_script=_DOWNLOAD_SCRIPT,
-        source="HuggingFace 镜像",
-    ),
-    AsrBackendSpec(
-        key="moss_hf",
-        label="MOSS HF（Transformers，~1.8GB）",
-        model_id="OpenMOSS/MOSS-Transcribe-Diarize",
-        default_path=default_asr_model_path("moss_hf"),
-        download_script=_DOWNLOAD_SCRIPT,
-        source="ModelScope",
-    ),
-    AsrBackendSpec(
-        key="vibevoice",
-        label="VibeVoice ASR（~16.7GB）",
-        model_id="microsoft/VibeVoice-ASR-HF",
-        default_path=default_asr_model_path("vibevoice"),
-        download_script=_DOWNLOAD_SCRIPT,
-        source="ModelScope",
-    ),
-)
+
+ASR_BACKENDS: tuple[AsrBackendSpec, ...] = _build_backend_specs()
 
 
 def _mlx_weights_present(path: Path) -> bool:
@@ -102,6 +94,13 @@ def backend_spec(backend: str) -> AsrBackendSpec | None:
     return None
 
 
+def backend_short_name(backend: str) -> str:
+    spec = backend_spec(backend)
+    if spec is None:
+        return backend
+    return get_source(backend).short_name
+
+
 def candidate_paths(backend: str, configured_path: Path | None = None) -> list[Path]:
     paths: list[Path] = []
     if configured_path is not None:
@@ -109,7 +108,6 @@ def candidate_paths(backend: str, configured_path: Path | None = None) -> list[P
     default = Path(default_asr_model_path(backend))
     if default not in paths:
         paths.append(default)
-    # MLX 权重目录在含 HF 配置时也可给 moss_hf 推理
     if backend == "moss_hf":
         mlx_path = Path(default_asr_model_path("mlx_moss"))
         if mlx_path not in paths:
@@ -156,8 +154,7 @@ def moss_hf_unavailable_error(path: Path, configured_backend: str) -> RuntimeErr
     return RuntimeError(
         f"MOSS HF 无法加载权重目录 {path}（缺少 {_MOSS_HF_CONFIG}）。"
         f"{backend_note}"
-        "请运行 ./scripts/download_asr_model.sh 下载 OpenMOSS/MOSS-Transcribe-Diarize（ModelScope），"
-        "或设置 MEMOFLOW_ASR_BACKEND=vibevoice。"
+        f"请运行 {DOWNLOAD_SCRIPT} 下载 OpenMOSS/MOSS-Transcribe-Diarize（ModelScope）。"
     )
 
 

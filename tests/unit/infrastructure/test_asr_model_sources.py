@@ -2,10 +2,11 @@ import pytest
 
 from memoflow.infrastructure.ai.asr_model_sources import (
     BACKENDS,
+    catalog_model_id,
+    default_local_dir_for_backend,
     get_source,
     hf_repo_for_backend,
     modelscope_repo_for_backend,
-    default_local_dir_for_backend,
 )
 
 
@@ -41,6 +42,10 @@ def test_backend_repo_mapping(backend, hf_repo, modelscope_repo, local_dir):
     assert hf_repo_for_backend(backend) == hf_repo
     assert modelscope_repo_for_backend(backend) == modelscope_repo
     assert default_local_dir_for_backend(backend) == local_dir
+    if modelscope_repo:
+        assert catalog_model_id(backend) == modelscope_repo
+    else:
+        assert catalog_model_id(backend) == hf_repo
 
 
 def test_mlx_moss_has_no_modelscope_repo():

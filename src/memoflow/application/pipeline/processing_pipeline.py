@@ -86,26 +86,15 @@ class MeetingProcessingPipeline:
             await uow.commit()
 
 
-def _detect_asr_backend(lower: str) -> str:
-    if "vibevoice" in lower:
-        return "VibeVoice"
-    if "mlx" in lower or "mlx_moss" in lower:
-        return "MOSS MLX"
-    if "moss" in lower or "moss_hf" in lower:
-        return "MOSS HF"
-    return "ASR"
-
-
 def _is_asr_model_error(lower: str, reason: str) -> bool:
     markers = (
-        "vibevoice",
-        "download_vibevoice_asr",
         "download_asr_model",
         "moss-transcribe-diarize",
         "configuration_moss_transcribe_diarize",
         "mlx 运行时",
         "moss hf",
         "mlx moss",
+        "vibevoice",
     )
     if any(marker in lower for marker in markers):
         return True
@@ -118,11 +107,9 @@ def _friendly_error(stage: str, reason: str) -> str:
     if "ffmpeg" in lower or "m4a" in lower or "torchcodec" in lower or "librosa cannot decode" in lower:
         return "缺少 ffmpeg 或音频解码失败。请运行 brew install ffmpeg 后点击「重试处理」。"
     if _is_asr_model_error(lower, reason):
-        backend = _detect_asr_backend(lower)
         return (
-            f"{backend} ASR 模型未就绪。"
-            "请运行 ./scripts/download_asr_model.sh 下载本地权重，"
-            "或设置 MEMOFLOW_ASR_BACKEND=vibevoice 后重试。"
+            "ASR 模型未就绪。请在设置页选择已下载的模型，"
+            "或运行 ./scripts/download_asr_model.sh 下载本地权重后重试。"
         )
     if "deepseek" in lower or ("api" in lower and "key" in lower and stage == "summarization"):
         return "DeepSeek API 调用失败。请在 .env 设置 MEMOFLOW_DEEPSEEK_API_KEY 并检查网络后重试。"

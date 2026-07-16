@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 
@@ -136,7 +138,7 @@ class SystemStatusResponse(BaseModel):
 
 
 class SelectAsrBackendRequest(BaseModel):
-    backend: str
+    backend: Literal["mlx_moss", "moss_hf", "vibevoice"]
 
 
 class SelectAsrBackendResponse(BaseModel):
