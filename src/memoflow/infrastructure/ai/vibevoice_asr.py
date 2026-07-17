@@ -18,21 +18,28 @@ from memoflow.infrastructure.ai.progress import ProgressCallback, report_progres
 
 _SOURCE = "HuggingFace"
 _DEFAULT_MODEL_PATH = "./models/VibeVoice-ASR"
-_MODEL_MARKERS = (
-    "config.json",
-    "preprocessor_config.json",
-    "tokenizer_config.json",
+_CONFIG_MARKER = "config.json"
+_WEIGHT_MARKERS = (
     "model.safetensors",
     "pytorch_model.bin",
+    "model.pt",
+    "model.bin",
 )
 
 
 def model_files_present(model_path: str | Path) -> bool:
-    """检查本地目录是否包含已下载的 VibeVoice-ASR 模型文件。"""
+    """检查本地目录是否包含可用的 VibeVoice-ASR 权重（config + 至少一个权重文件）。"""
     path = Path(model_path).expanduser()
     if not path.is_dir():
         return False
-    return any((path / name).exists() for name in _MODEL_MARKERS)
+    if not (path / _CONFIG_MARKER).is_file():
+        return False
+    if any((path / name).is_file() for name in _WEIGHT_MARKERS):
+        return True
+    # 分片 safetensors（与 moss_hf 就绪检测同思路）
+    return (path / "model-00000-of-00001.safetensors").is_file() or any(
+        path.glob("model-*-of-*.safetensors")
+    )
 
 
 def _resolve_device(device: str) -> str:

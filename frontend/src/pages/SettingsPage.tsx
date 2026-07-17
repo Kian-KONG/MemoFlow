@@ -149,8 +149,8 @@ export function SettingsPage() {
             <code>data/runtime_preferences.json</code>
           </li>
           <li>
-            <strong>统一下载</strong>: <code>./scripts/download_asr_model.sh</code>（moss_hf /
-            vibevoice 默认 ModelScope；Mac mlx_moss 走 HF 镜像）
+            <strong>统一下载</strong>: <code>./scripts/download_asr_model.sh</code>（Mac
+            默认 moss_hf；vibevoice 默认 ModelScope；可选 mlx_moss 走 HF 镜像）
           </li>
           <li>
             <strong>MOSS MLX</strong>: <code>pip install -e &quot;.[mlx-moss-asr]&quot;</code>

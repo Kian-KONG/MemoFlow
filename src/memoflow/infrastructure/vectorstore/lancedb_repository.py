@@ -16,11 +16,21 @@ from memoflow.domain.knowledge.repository import KnowledgeSearchHit, VectorRepos
 from memoflow.domain.knowledge.value_objects import Embedding
 
 _TABLE_NAME = "knowledge_chunks"
+_VECTOR_COLUMN = "vector"
 
 
 def _escape_literal(value: str) -> str:
     """转义用于 LanceDB SQL 过滤表达式中的字符串字面量，防止过滤条件注入。"""
     return value.replace("'", "''")
+
+
+def _table_vector_dimension(table: lancedb.table.Table) -> int | None:
+    """从已有表的 schema 读取固定长度 vector 列维度；无法识别时返回 None。"""
+    field = table.schema.field(_VECTOR_COLUMN)
+    list_size = getattr(field.type, "list_size", None)
+    if isinstance(list_size, int) and list_size > 0:
+        return list_size
+    return None
 
 
 class LanceDBVectorRepository(VectorRepository):
@@ -32,6 +42,21 @@ class LanceDBVectorRepository(VectorRepository):
         if self._db is None:
             self._db = lancedb.connect(self._db_uri)
         return self._db
+
+    def _dimension_mismatch_error(self, stored_dim: int, expected_dim: int) -> ValueError:
+        return ValueError(
+            f"LanceDB 向量维度不匹配：表中已有维度为 {stored_dim}，"
+            f"当前 Embedding 维度为 {expected_dim}。"
+            f"更换 Embedding 模型或维度后需清空并重建向量库目录 "
+            f"（当前路径：{self._db_uri}，默认一般为 data/lancedb）。"
+        )
+
+    def _ensure_compatible_dimension(self, table: lancedb.table.Table, expected_dim: int) -> None:
+        stored_dim = _table_vector_dimension(table)
+        if stored_dim is None:
+            return
+        if stored_dim != expected_dim:
+            raise self._dimension_mismatch_error(stored_dim, expected_dim)
 
     def _open_table_or_none(self) -> lancedb.table.Table | None:
         """尝试打开知识库表，不存在时返回 None。
@@ -49,6 +74,7 @@ class LanceDBVectorRepository(VectorRepository):
     def _get_or_create_table(self, dim: int) -> lancedb.table.Table:
         existing = self._open_table_or_none()
         if existing is not None:
+            self._ensure_compatible_dimension(existing, dim)
             return existing
         db = self._connect()
         schema = pa.schema(
@@ -57,7 +83,7 @@ class LanceDBVectorRepository(VectorRepository):
                 pa.field("meeting_id", pa.string()),
                 pa.field("text", pa.string()),
                 pa.field("source_utterance_ids", pa.string()),  # JSON 编码的字符串数组
-                pa.field("vector", pa.list_(pa.float32(), dim)),
+                pa.field(_VECTOR_COLUMN, pa.list_(pa.float32(), dim)),
             ]
         )
         return db.create_table(_TABLE_NAME, schema=schema)
@@ -99,6 +125,7 @@ class LanceDBVectorRepository(VectorRepository):
         table = self._open_table_or_none()
         if table is None:
             return []
+        self._ensure_compatible_dimension(table, query_embedding.dimension)
         query = table.search(list(query_embedding.vector)).limit(top_k)
         if meeting_id:
             query = query.where(f"meeting_id = '{_escape_literal(meeting_id)}'")

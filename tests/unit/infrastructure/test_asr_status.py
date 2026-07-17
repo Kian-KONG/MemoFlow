@@ -8,6 +8,7 @@ from memoflow.infrastructure.ai.asr_status import (
     download_command,
     is_mlx_only_weights,
     moss_hf_config_present,
+    resolve_active_backend,
     resolve_model_path,
     resolve_moss_hf_model_path,
     weights_present,
@@ -167,6 +168,54 @@ def test_weights_present_moss_hf_rejects_configuration_json_only(tmp_path: Path)
 
 def test_weights_present_unknown_backend(tmp_path: Path):
     assert weights_present("unknown", tmp_path) is False
+
+
+def _write_vibevoice_partial(path: Path, *names: str) -> None:
+    path.mkdir(parents=True, exist_ok=True)
+    for name in names:
+        (path / name).write_text("{}", encoding="utf-8")
+
+
+def test_weights_present_vibevoice_rejects_config_only(tmp_path: Path):
+    model_dir = tmp_path / "vibevoice-partial"
+    _write_vibevoice_partial(model_dir, "config.json")
+    assert weights_present("vibevoice", model_dir) is False
+
+
+def test_weights_present_vibevoice_rejects_tokenizer_without_weights(tmp_path: Path):
+    model_dir = tmp_path / "vibevoice-tokenizer-only"
+    _write_vibevoice_partial(
+        model_dir,
+        "config.json",
+        "preprocessor_config.json",
+        "tokenizer_config.json",
+    )
+    assert weights_present("vibevoice", model_dir) is False
+
+
+def test_weights_present_vibevoice_requires_config_and_weight(tmp_path: Path):
+    model_dir = tmp_path / "vibevoice-complete"
+    model_dir.mkdir()
+    (model_dir / "config.json").write_text("{}", encoding="utf-8")
+    (model_dir / "model.safetensors").write_bytes(b"x" * 64)
+    assert weights_present("vibevoice", model_dir) is True
+
+
+def test_weights_present_vibevoice_accepts_sharded_safetensors(tmp_path: Path):
+    model_dir = tmp_path / "vibevoice-sharded"
+    model_dir.mkdir()
+    (model_dir / "config.json").write_text("{}", encoding="utf-8")
+    (model_dir / "model-00001-of-00002.safetensors").write_bytes(b"x" * 32)
+    assert weights_present("vibevoice", model_dir) is True
+
+
+def test_resolve_active_backend_falls_back_when_mlx_runtime_missing(monkeypatch):
+    monkeypatch.setattr(
+        "memoflow.infrastructure.ai.asr_status.mlx_runtime_available",
+        lambda: False,
+    )
+    assert resolve_active_backend("mlx_moss") == "moss_hf"
+    assert resolve_active_backend("moss_hf") == "moss_hf"
 
 
 def test_download_command_mentions_modelscope_or_hf_mirror():

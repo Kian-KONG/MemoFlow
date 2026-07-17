@@ -41,7 +41,7 @@ class DeepSeekLLM(LLMPort):
     def _get_client(self):
         if not self._api_key:
             raise RuntimeError(
-                "未配置 DeepSeek API Key。请在 .env 中设置 MEMOFLOW_DEEPSEEK_API_KEY。"
+                "未配置 LLM API Key。请在 .env 中设置 MEMOFLOW_DEEPSEEK_API_KEY 或 BOSCH_AIGC_API_KEY。"
             )
         if self._client is None:
             from openai import AsyncOpenAI
@@ -93,7 +93,9 @@ class DeepSeekLLM(LLMPort):
 
         if isinstance(exc, AuthenticationError):
             logger.error("DeepSeek API 认证失败，请检查 API Key")
-            return RuntimeError("DeepSeek API 认证失败，请检查 MEMOFLOW_DEEPSEEK_API_KEY 是否正确。")
+            return RuntimeError(
+                "DeepSeek API 认证失败，请检查 MEMOFLOW_DEEPSEEK_API_KEY 或 BOSCH_AIGC_API_KEY 是否正确。"
+            )
         if isinstance(exc, RateLimitError):
             logger.error(f"DeepSeek API 请求频率超限: {exc}")
             return RuntimeError("DeepSeek API 请求频率超限，请稍后重试。")

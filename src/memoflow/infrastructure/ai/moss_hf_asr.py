@@ -97,7 +97,7 @@ class MossHFASR(ASRPort):
 
         dtype = "bf16" if self._device in {"cuda", "mps"} else "fp32"
         self._runner = ModelRunner(load_path, device=self._device, dtype=dtype)
-        self._runner._ensure_loaded()
+        self._runner.ensure_loaded()
 
         report_progress(on_progress, 100, "MOSS-Transcribe-Diarize 已就绪")
         logger.info("MOSS HF 模型加载完成")

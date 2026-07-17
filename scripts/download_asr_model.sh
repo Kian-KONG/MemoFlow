@@ -25,8 +25,9 @@ cd "$ROOT"
 
 BACKEND="${MEMOFLOW_ASR_BACKEND:-}"
 if [[ -z "$BACKEND" ]]; then
+  # 与 default_asr_backend() 对齐：Mac 默认 moss_hf（尚无可用 MLX 运行时）
   if [[ "$(uname -s)" == "Darwin" && "$(uname -m)" == "arm64" ]]; then
-    BACKEND="mlx_moss"
+    BACKEND="moss_hf"
   else
     BACKEND="vibevoice"
   fi

@@ -147,6 +147,10 @@ class ModelRunner:
                 top_k=top_k if do_sample else None,
             )
 
+    def ensure_loaded(self) -> None:
+        """Public entry point to eagerly load model weights."""
+        self._ensure_loaded()
+
     def _ensure_loaded(self) -> None:
         if self.is_loaded:
             return

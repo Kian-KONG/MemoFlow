@@ -41,9 +41,11 @@ class Settings(BaseSettings):
     database_url: str = "sqlite+aiosqlite:///./data/memoflow.db"
     lancedb_dir: Path = Path("./data/lancedb")
     audio_dir: Path = Path("./data/audio")
+    # 单次会议录音上传上限（与领域 AudioValidationPolicy 2GiB 对齐；可按环境调低）
+    max_upload_bytes: int = 2 * 1024 * 1024 * 1024
 
     # ASR（本地权重，通过 scripts/download_asr_model.sh 下载）
-    # Mac Apple Silicon 默认 mlx_moss（~1.8GB）；其他平台默认 vibevoice
+    # Mac Apple Silicon 默认 moss_hf；mlx_moss 可选（需 MLX 运行时）；其他平台默认 vibevoice
     asr_backend: str = Field(default_factory=default_asr_backend)  # mlx_moss | moss_hf | vibevoice | auto
     asr_model_id: str = Field(default="")
     asr_model_path: Path = Field(default=Path("."))

@@ -1,12 +1,14 @@
 """会议相关 API：上传、查询、重试处理流水线。"""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 
 from memoflow.application.meeting_service import MeetingApplicationService
+from memoflow.config import get_settings
 from memoflow.domain.meeting.value_objects import MeetingStatus
 from memoflow.interfaces.api.deps import get_meeting_service
 from memoflow.interfaces.api.schemas import MeetingResponse
+from memoflow.interfaces.api.upload_stream import UploadTooLargeError, read_upload_limited
 
 router = APIRouter(prefix="/api/meetings", tags=["meetings"])
 
@@ -32,7 +34,15 @@ async def upload_meeting(
     title: str = Form(default="", description="会议标题，留空则使用文件名"),
     service: MeetingApplicationService = Depends(get_meeting_service),
 ) -> MeetingResponse:
-    content = await file.read()
+    max_bytes = get_settings().max_upload_bytes
+    try:
+        content = await read_upload_limited(file, max_bytes=max_bytes)
+    except UploadTooLargeError as exc:
+        raise HTTPException(
+            status_code=413,
+            detail=str(exc),
+        ) from exc
+
     dto = await service.upload_meeting(
         title=title,
         filename=file.filename or "recording",

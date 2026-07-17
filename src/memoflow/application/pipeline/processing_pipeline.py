@@ -112,7 +112,10 @@ def _friendly_error(stage: str, reason: str) -> str:
             "或运行 ./scripts/download_asr_model.sh 下载本地权重后重试。"
         )
     if "deepseek" in lower or ("api" in lower and "key" in lower and stage == "summarization"):
-        return "DeepSeek API 调用失败。请在 .env 设置 MEMOFLOW_DEEPSEEK_API_KEY 并检查网络后重试。"
+        return (
+            "DeepSeek API 调用失败。请在 .env 设置 MEMOFLOW_DEEPSEEK_API_KEY "
+            "或 BOSCH_AIGC_API_KEY 并检查网络后重试。"
+        )
     if "openai" in lower or "embedding" in lower:
         return "OpenAI Embedding API 调用失败。请在 .env 设置 MEMOFLOW_OPENAI_API_KEY 后重试。"
     if "rerank" in lower or "dashscope" in lower:
